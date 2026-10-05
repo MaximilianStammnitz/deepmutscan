@@ -20,57 +20,54 @@
 
 ## Introduction
 
-**nf-core/deepmutscan** is a workflow designed for the analysis of deep mutational scanning (DMS) data. DMS enables researchers to experimentally measure the fitness effects of thousands of genes or gene variants simultaneously, helping to classify disease causing mutants in human and animal populations, to learn the fundamental rules of protein architecture, small-molecule binding, mRNA splicing, viral evolution and many other quantifiable phenotypes.
+**nf-core/deepmutscan** is a workflow designed for the analysis of deep mutational scanning (DMS) data. DMS enables researchers to experimentally measure the fitness effects of thousands of gene variants simultaneously, helping to classify disease-causing mutants in human and other species populations, and to learn the fundamental rules of protein architecture, small-molecule binding, mRNA splicing, viral evolution and many other quantifiable phenotypes.
 
-While DNA synthesis and sequencing technologies have advanced substantially, long open reading frame (ORF) targets still present a major challenge for DMS studies. Shotgun DNA sequencing can be used to greatly speed up the inference of long ORF mutant fitness landscapes, theoretically at no expense in accuracy. We have designed the `nf-core/deepmutscan` pipeline to unlock the power of shotgun sequencing based DMS studies on long ORFs, to simplify and standardise the complex bioinformatics steps involved in data processing of such experiments – from read alignment to QC reporting and fitness landscape inferences.
+While DNA synthesis and sequencing technologies have advanced substantially, long open reading frame (ORF) targets still present a major challenge for DMS studies. Shotgun DNA sequencing of randomly fragmented variant libraries can greatly speed up the inference of long ORF mutant fitness landscapes, as it avoids the need for library barcoding or multi-tile sequencing. We have designed `nf-core/deepmutscan` to unlock shotgun sequencing-based DMS studies on long ORFs, and to simplify and standardise the bioinformatics steps involved in processing such experiments – from read alignment to QC reporting, variant count error correction and fitness landscape inference. Amplicon (tile) sequencing data can be processed in the same way.
 
 ![nf-core/deepmutscan workflow](docs/images/pipeline.png)
 
-The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It uses Docker/Singularity containers making installation trivial and results highly reproducible. The [Nextflow DSL2](https://www.nextflow.io/docs/latest/dsl2.html) implementation of this pipeline uses one container per process which makes it much easier to maintain and update software dependencies. Where possible, these processes have been submitted to and installed from [nf-core/modules](https://github.com/nf-core/modules) in order to make them available to all nf-core pipelines, and to everyone within the Nextflow community!
-
-On release, automated continuous integration tests run the pipeline on a full-sized dataset on the AWS cloud infrastructure. This ensures that the pipeline runs on AWS, has sensible resource allocation defaults set to run on real-world datasets, and permits the persistent storage of results to benchmark between pipeline releases and other analysis sources. The results obtained from the full-sized test can be viewed on the [nf-core website](https://nf-co.re/deepmutscan/results).
-
 ## Major features
 
-- End-to-end analyses of various DMS data
-- Modular, three-stage workflow: alignment → QC → error-aware fitness estimation
-- Integration with popular statistical fitness estimation tools like [DiMSum](https://github.com/lehner-lab/DiMSum), [Enrich2](https://github.com/FowlerLab/Enrich2), [rosace](https://github.com/pimentellab/rosace/) and [mutscan](https://github.com/fmicompbio/mutscan)
-- Support of multiple mutagenesis strategies, e.g. by nicking with degenerate NNK and NNS codons
-- Containerisation via Docker, Singularity and Apptainer
-- Scalability across HPC and Cloud systems
-- Monitoring of CPU, memory, and CO₂ usage
+- End-to-end processing of DMS libraries from shotgun (randomly fragmented) or amplicon short-read sequencing
+- Light-weight variant counter with base-quality and read-edge filters, producing GATK `AnalyzeSaturationMutagenesis`-compatible count tables
+- Intrinsic sequencing-error correction of single-nucleotide variant counts from read-linked false double mutants (maximum-likelihood or empirical-Bayes estimators), or from additional wildtype template sequencing
+- Library quality control: mutant count heatmaps, positional coverage and mutation-type biases, sequencing-depth rarefaction
+- Fitness estimation with a built-in log-ratio estimator, plus optional [DiMSum](https://github.com/lehner-lab/DiMSum) and [mutscan](https://github.com/fmicompbio/mutscan)
+- Support for degenerate codon libraries (NNK, NNS, NNH, NNN and combinations), e.g. from nicking mutagenesis, and for custom (position-specific) codon libraries, e.g. from Twist tiles
+- A single, self-contained HTML report per run, and an optional interactive 3D variant effect inspection tool when a wildtype structure is supplied
+- Containerisation via Docker, Singularity/Apptainer and Conda; scalability across HPC and cloud systems
 
-For more details on the pipeline and on potential future expansions, please consider reading our [usage description](https://nf-co.re/deepmutscan/usage).
+For more details on the individual steps and on planned extensions, please read the [usage documentation](https://nf-co.re/deepmutscan/usage).
 
-## Step-by-step pipeline summary
+## Pipeline summary
 
-The pipeline processes deep mutational scanning (DMS) sequencing data in several stages:
-
-1. Alignment of reads to the reference open reading frame (ORF) (`BWA-mem`)
-2. Filtering of wildtype and erroneous reads (`samtools view`)
-3. Read merging for base error reduction (`vsearch merge`)
-4. Mutation counting
-5. Single nucleotide variant error correction
-6. DMS library quality control
-7. Data summarisation across samples
-8. Fitness estimation (`DiMSum`, `mutscan`)
+1. Raw read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
+2. Alignment of reads to the reference ORF ([`BWA-MEM`](https://github.com/lh3/bwa))
+3. Filtering of unmapped, secondary, low mapping-quality and indel-containing alignments ([`samtools view`](https://www.htslib.org/))
+4. Merging of overlapping read pairs into consensus reads for base error reduction ([`vsearch --fastq_mergepairs`](https://github.com/torognes/vsearch)), re-alignment, sorting and indexing ([`samtools`](https://www.htslib.org/))
+5. Variant counting (custom counter built on [`pysam`](https://github.com/pysam-developers/pysam) and [`polars`](https://pola.rs))
+6. Annotation and filtering of variant counts against the programmed mutagenesis library
+7. Single-nucleotide variant sequencing-error correction via false double mutants or wildtype sequencing
+8. DMS library quality control and visualisation
+9. _Optional:_ fitness estimation from matched input/output samples (default estimator, [`DiMSum`](https://github.com/lehner-lab/DiMSum), [`mutscan`](https://github.com/fmicompbio/mutscan)) and interactive 3D variant effect inspection tool ([`3Dmol.js`](https://3dmol.csb.pitt.edu/))
+10. Run-level reporting ([`MultiQC`](http://multiqc.info/) and an all-in-one `deepmutscan_report.html`)
 
 ## Usage
 
 > [!NOTE]
 > If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/get_started/environment_setup/overview) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/get_started/run-your-first-pipeline) with `-profile test` before running the workflow on actual data.
 
-First, prepare a samplesheet with your input/output data in which each row represents a pair of fastq files (paired end). This should look as follows:
+First, prepare a samplesheet with your input data. Each row represents one sequencing library as a pair of FASTQ files (paired-end), annotated with the biological sample, its type in the selection experiment (`input`, `output` or `wildtype`) and the replicate number:
 
 ```csv title="samplesheet.csv"
 sample,type,replicate,file1,file2
-ORF1,input,1,/reads/forward1.fastq.gz,/reads/reverse1.fastq.gz
-ORF1,input,2,/reads/forward2.fastq.gz,/reads/reverse2.fastq.gz
-ORF1,output,1,/reads/forward3.fastq.gz,/reads/reverse3.fastq.gz
-ORF1,output,2,/reads/forward4.fastq.gz,/reads/reverse4.fastq.gz
+ORF1,input,1,/reads/input1_R1.fastq.gz,/reads/input1_R2.fastq.gz
+ORF1,input,2,/reads/input2_R1.fastq.gz,/reads/input2_R2.fastq.gz
+ORF1,output,1,/reads/output1_R1.fastq.gz,/reads/output1_R2.fastq.gz
+ORF1,output,2,/reads/output2_R1.fastq.gz,/reads/output2_R2.fastq.gz
 ```
 
-Secondly, specify the gene or gene region of interest using a reference FASTA file via `--fasta`. Provide the exact codon coordinates using `--reading_frame`.
+Secondly, provide the gene or gene region of interest as a reference FASTA file via `--fasta`, and the nucleotide coordinates of the mutagenised open reading frame within it via `--reading_frame` (1-based, inclusive, e.g. `1-300` for the first 100 codons).
 
 Now, you can run the pipeline using:
 
@@ -83,43 +80,52 @@ nextflow run nf-core/deepmutscan \
    --outdir ./results
 ```
 
+Add `--fitness` to estimate variant fitness from the input and output samples, and see the [usage documentation](https://nf-co.re/deepmutscan/usage) and the [parameter documentation](https://nf-co.re/deepmutscan/parameters) for all other options.
+
+> [!WARNING]
+> Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/usage/getting_started/configuration#custom-configuration-files).
+
 ## Pipeline output
 
 To see the results of an example test run with a full size dataset refer to the [results](https://nf-co.re/deepmutscan/results) tab on the nf-core website pipeline page.
-
-For more details about the output files and reports, please refer to the
-[output documentation](https://nf-co.re/deepmutscan/output).
-
-## Contributing
-
-We welcome contributions from the community!
-
-For technical challenges and feedback on the pipeline, please use our [Github repository](https://github.com/nf-core/deepmutscan). Please open an [issue](https://github.com/nf-core/deepmutscan/issues/new) or [pull request](https://github.com/nf-core/deepmutscan/compare) to:
-
-- Report bugs or solve data incompatibilities when running `nf-core/deepmutscan`
-- Suggest the implementation of new modules for custom DMS workflows
-- Help improve this documentation
-
-If you are interested in getting involved as a developer, please consider joining our interactive [`#deepmutscan` Slack channel](https://nfcore.slack.com/channels/deepmutscan) (via [this invite](https://nf-co.re/join/slack)).
+For more details about the output files and reports, please refer to the [output documentation](https://nf-co.re/deepmutscan/output).
 
 ## Credits
 
-nf-core/deepmutscan was originally written by [Benjamin Wehnert](https://github.com/BenjaminWehnert1008) and [Max Stammnitz](https://github.com/MaximilianStammnitz) at the [Centre for Genomic Regulation, Barcelona](https://www.crg.eu/), with the generous support of an EMBO Long-term Postdoctoral Fellowship and a Marie Skłodowska-Curie grant by the European Union.
+nf-core/deepmutscan was originally written by [Benjamin Wehnert](https://github.com/BenjaminWehnert1008) and [Maximilian Stammnitz](https://github.com/MaximilianStammnitz) at the [Centre for Genomic Regulation (CRG), Barcelona](https://www.crg.eu/), with the generous support of an EMBO Long-term Postdoctoral Fellowship, the Erasmus+ programme and a Marie Skłodowska-Curie grant by the European Union.
 
-If you use `nf-core/deepmutscan` in your analyses, please cite:
+We thank the following people for their extensive assistance in the development of this pipeline:
 
-> 📄 Wehnert et al., _bioRxiv_ preprint (coming soon)
+- [Fei Sang](https://github.com/fei-hgi) (Wellcome Sanger Institute) – original variant counting implementation
+- [Júlia Mir-Pedrol](https://github.com/mirpedrol) (CRG) – nf-core development guidance and code review
+- [Matthias Hörtenhuber](https://github.com/mashehu) (SciLifeLab) – nf-core development guidance and code review
 
-Please also cite the `nf-core` framework:
+## Contributions and Support
 
-> 📄 Ewels et al., _Nature Biotechnology_, 2020
-> [https://doi.org/10.1038/s41587-020-0439-x](https://doi.org/10.1038/s41587-020-0439-x)
+If you would like to contribute to this pipeline, please see the [contributing guidelines](docs/CONTRIBUTING.md).
 
-For further information or help, don't hesitate to get in touch on the [Slack `#deepmutscan` channel](https://nfcore.slack.com/channels/deepmutscan) (you can join with [this invite](https://nf-co.re/join/slack)).
-
-## Scientific contact
+For further information or help, don't hesitate to get in touch on the [Slack `#deepmutscan` channel](https://nfcore.slack.com/channels/deepmutscan) (you can join with [this invite](https://nf-co.re/join/slack)). Bug reports and feature requests are welcome as GitHub [issues](https://github.com/nf-core/deepmutscan/issues).
 
 For scientific discussions around the use of this pipeline (e.g. on experimental design or sequencing data requirements), please feel free to get in touch with us directly:
 
 - Benjamin Wehnert — wehnertbenjamin@gmail.com
 - Maximilian Stammnitz — maximilian.stammnitz@crg.eu
+
+## Citations
+
+If you use `nf-core/deepmutscan` for your analysis, please cite it as follows:
+
+> Wehnert B, et al. _bioRxiv_ preprint (in preparation).
+
+<!-- Add the Zenodo DOI after the first release: -->
+<!-- If you use nf-core/deepmutscan for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
+
+An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
+
+You can cite the `nf-core` publication as follows:
+
+> **The nf-core framework for community-curated bioinformatics pipelines.**
+>
+> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
+>
+> _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
