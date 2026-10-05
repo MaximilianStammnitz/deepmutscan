@@ -50,7 +50,7 @@ For more details on the individual steps and on planned extensions, please read 
 7. Single-nucleotide variant sequencing-error correction via false double mutants or wildtype sequencing
 8. DMS library quality control and visualisation
 9. _Optional:_ fitness estimation from matched input/output samples (default estimator, [`DiMSum`](https://github.com/lehner-lab/DiMSum), [`mutscan`](https://github.com/fmicompbio/mutscan)) and interactive 3D variant effect inspection tool ([`3Dmol.js`](https://3dmol.csb.pitt.edu/))
-10. Run-level reporting ([`MultiQC`](http://multiqc.info/) and an all-in-one `deepmutscan_report.html`)
+10. An all-in-one `deepmutscan_report.html`
 
 ## Usage
 
