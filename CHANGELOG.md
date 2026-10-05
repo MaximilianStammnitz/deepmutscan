@@ -24,6 +24,8 @@ Initial release of nf-core/deepmutscan, created with the [nf-core](https://nf-co
 - DMS library QC per library: count and count-per-coverage heatmaps, sorted count distributions, sliding-window coverage and count profiles (`--sliding_window_size`, `--aimed_cov`), and sequencing-depth rarefaction (`--run_seqdepth`)
 - Optional fitness estimation (`--fitness`): merged count tables, experimental design, synonymous wildtype proxy selection, default log-ratio fitness with replicate rescaling and summary statistics, replicate correlation plots and fitness heatmap
 - Optional fitness estimation with DiMSum (`--dimsum`) and mutscan edgeR / limma (`--mutscan`)
+- Minimum input read count per replicate for fitness estimation (`--min_counts`, default 10), applied to the default estimator, DiMSum and mutscan
+- Optional output pseudocount for dropout variants (`--output_pseudocount`, default 1; 0 disables), applied to the default estimator and DiMSum
 - Optional interactive 3D variant effect inspection tool built from a user-supplied wildtype structure (`--pdb`)
 - Self-contained, all-in-one run report (`deepmutscan_report.html`) embedding QC, error-correction, fitness, MultiQC and run statistics
 - `test` profile on a 50,000 read-pair subsample of a GID1A nicking-mutagenesis GluePCA experiment, with nf-test snapshot testing
