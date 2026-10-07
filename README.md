@@ -29,7 +29,7 @@ While DNA synthesis and sequencing technologies have advanced substantially, lon
 ## Major features
 
 - End-to-end processing of DMS libraries from shotgun (randomly fragmented) or amplicon short-read sequencing
-- Light-weight variant counter with base-quality and read-edge filters, producing GATK `AnalyzeSaturationMutagenesis`-compatible count tables
+- Light-weight variant counter with base-quality and read-edge filters, replacing `GATK AnalyzeSaturationMutagenesis`
 - Intrinsic sequencing-error correction of single-nucleotide variant counts from read-linked false double mutants (maximum-likelihood or empirical-Bayes estimators), or from additional wildtype template sequencing
 - Library quality control: mutant count heatmaps, positional coverage and mutation-type biases, sequencing-depth rarefaction
 - Fitness estimation with a built-in log-ratio estimator, plus optional [DiMSum](https://github.com/lehner-lab/DiMSum) and [mutscan](https://github.com/fmicompbio/mutscan)
