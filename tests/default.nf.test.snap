@@ -357,10 +357,10 @@
                 "variant_counts_columns.tsv:md5,c94801255a553ce5ff4a00d3170f6768",
                 "variant_counts_columns.tsv:md5,c94801255a553ce5ff4a00d3170f6768",
                 "variant_counts_columns.tsv:md5,c94801255a553ce5ff4a00d3170f6768",
-                "seqdepth_curve.csv:md5,b3d9041a2812b56a813bb69f61c7163a",
-                "seqdepth_curve.csv:md5,47bc7210d898e07966ac9a7adfec9ebf",
-                "seqdepth_curve.csv:md5,148be1fe719cf8194e4539cba7a7361a",
-                "seqdepth_curve.csv:md5,96bbb8a5e431acfa97a2e3960cce1e32",
+                "seqdepth_curve.csv:md5,a7217ad283c687d26d68c84c897f5f9e",
+                "seqdepth_curve.csv:md5,5daeef9c60240ac5eebafe632def9f65",
+                "seqdepth_curve.csv:md5,7fd3fd5ce9b8f3e5b2a336ee5719b5e2",
+                "seqdepth_curve.csv:md5,341bda014e405be6c6f572164daf5aae",
                 "error_correction_report.html:md5,802b1cca71ffb34758810cea748c73ea",
                 "fastqc-status-check-heatmap.txt:md5,58a9580c11af4210b1af65753383e120",
                 "fastqc_adapter_content_plot.txt:md5,2990ad34b6fa29151dd4b9a38828afbe",
@@ -381,7 +381,7 @@
                 "limma_rowCount": 1230
             }
         ],
-        "timestamp": "2026-08-25T00:14:40.583305",
+        "timestamp": "2026-10-06T14:37:13.192327",
         "meta": {
             "nf-test": "0.9.4",
             "nextflow": "26.04.1"

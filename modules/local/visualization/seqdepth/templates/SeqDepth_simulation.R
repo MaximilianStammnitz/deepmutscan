@@ -12,13 +12,30 @@
 #
 # where N is the total read count and c_i the reads on variant i. It is exact (no Monte-Carlo noise),
 # needs no random sampling, and is orders of magnitude faster than draw-one-read-at-a-time loops - so
-# the step count can be fine without the runtime blowing up.
+# the step count can be fine without the runtime blowing up. Being exact at every depth, a finer grid
+# only resolves the curve better; it cannot change it.
+#
+# Depth grid: the step size grows by a constant factor from 0.01% at the bottom to 5% at the top
+# (0.95 -> 1). Each step is then a fixed fraction (~5%) of the depth it starts from, so the steep
+# low-depth rise is resolved as finely as the flat top, whatever depth a given library saturates at.
+# With these defaults that is 123 steps.
 
 library(ggplot2)
 
+# 0, then the cumulative sum of K geometrically growing steps that ends at exactly 1 with a final step
+# of `last_step`. K comes from the closed-form ratio (1 - first_step) / (1 - last_step), rounded up to
+# a whole number of steps; the ratio is then re-solved for that K so both ends stay exact.
+depth_grid <- function(first_step = 1e-4, last_step = 0.05) {
+  K <- ceiling(1 + log(last_step / first_step) / log((1 - first_step) / (1 - last_step)))
+  r <- uniroot(function(r) last_step * (1 - r^-K) / (1 - 1 / r) - 1,
+               c(1 + 1e-9, 2), tol = 1e-12)\$root
+  c(0, cumsum(last_step * r^-((K - 1):0)))
+}
+
 SeqDepth_simulation_plot <- function(prefiltered_gatk_path, possible_mutations_path,
                                      output_file_path, curve_csv_path,
-                                     n_steps = 40, threshold = 3) {
+                                     first_step = 1e-4, last_step = 0.05,
+                                     threshold = 3) {
 
   data <- read.csv(prefiltered_gatk_path)
   counts <- as.numeric(data\$counts)
@@ -31,8 +48,9 @@ SeqDepth_simulation_plot <- function(prefiltered_gatk_path, possible_mutations_p
     stop("SeqDepth: no counts or no possible mutations to rarefy")
   }
 
-  # Evenly spaced depths from 0 to the full library, as integer read totals.
-  depths <- unique(round(seq(0, N, length.out = n_steps + 1)))
+  # Depth fractions from depth_grid(), as integer read totals. unique() drops the collisions that
+  # rounding produces at the bottom of very small libraries.
+  depths <- unique(round(depth_grid(first_step, last_step) * N))
 
   # Expected detected variants at each depth. phyper is vectorised over the per-variant counts, so each
   # depth is one vectorised call; `lower.tail = FALSE` gives P(X > threshold-1) = P(X >= threshold).
@@ -42,7 +60,7 @@ SeqDepth_simulation_plot <- function(prefiltered_gatk_path, possible_mutations_p
   }, numeric(1))
 
   curve <- data.frame(
-    depth_fold   = round(depths / N, 4),                       # x: fraction of full sequencing depth
+    depth_fold   = round(depths / N, 6),                       # x: fraction of full sequencing depth
     variants_pct = round(expected_detected / total_possible * 100, 4)  # y: % of the possible library
   )
   write.csv(curve, curve_csv_path, row.names = FALSE)
@@ -81,7 +99,8 @@ SeqDepth_simulation_plot(
   possible_mutations_path = "$possible_mutations",
   output_file_path        = "SeqDepth.pdf",
   curve_csv_path          = "seqdepth_curve.csv",
-  n_steps                 = 40,
+  first_step              = 1e-4,
+  last_step               = 0.05,
   threshold               = $min_counts
   )
 
