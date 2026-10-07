@@ -147,15 +147,34 @@ STORAGE_SHIM = """<script>
 })();
 </script>"""
 
+# A srcdoc frame resolves relative URLs against the PARENT document's URL, so an in-page link such as
+# MultiQC's sidebar `href="#fastqc"` does not scroll the frame: it navigates the frame to
+# deepmutscan_report.html#fastqc, i.e. loads the whole report inside itself, again on every click.
+# Catch same-page links before the browser follows them and scroll to the target instead. Links that
+# only toggle a widget (Bootstrap collapse/tab) keep their own handlers; they just lose the navigation.
+ANCHOR_SHIM = """<script>
+document.addEventListener('click', function (e) {
+  var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+  if (!a) return;
+  var href = a.getAttribute('href');
+  if (!href || href.charAt(0) !== '#') return;
+  e.preventDefault();
+  if (a.hasAttribute('data-bs-toggle') || a.hasAttribute('data-toggle')) return;
+  var id = decodeURIComponent(href.slice(1));
+  var t = id && (document.getElementById(id) || document.getElementsByName(id)[0]);
+  if (t) t.scrollIntoView();
+}, true);
+</script>"""
+
 HEAD_RE = re.compile(r"<head[^>]*>", re.I)
 
 
 def html_for_frame(path):
-    """Read an embedded report and make it survive an opaque origin."""
+    """Read an embedded report and make it work inside a srcdoc frame."""
     text = Path(path).read_text(encoding="utf-8", errors="surrogateescape")
     m = HEAD_RE.search(text)
     if m:
-        text = text[: m.end()] + STORAGE_SHIM + text[m.end():]
+        text = text[: m.end()] + STORAGE_SHIM + ANCHOR_SHIM + text[m.end():]
     return text
 
 
