@@ -75,7 +75,7 @@ Note that the pipeline will create the following files in your working directory
 ```bash
 work                # Directory containing the nextflow working files
 <OUTDIR>            # Finished results in specified location (defined with --outdir)
-.nextflow_log       # Log file from Nextflow
+.nextflow.log       # Log file from Nextflow
 # Other nextflow hidden files, eg. history of pipeline runs and old logs.
 ```
 
@@ -131,6 +131,10 @@ Merged reads are screened for base-level mismatches against the reference. `nf-c
 Two parameters tune the counter:
 
 - `--base_qual` (default `40`): minimum Phred base quality for a mismatch to be counted, and for a base to contribute to coverage.
+  Note what this threshold implies: `vsearch` recalculates qualities only where the two mates overlap, so a base in the overlap
+  that both mates agree on can exceed the instrument's own maximum, while bases outside the overlap keep their instrument quality.
+  On quality-binned instrument data (NovaSeq bins at Q37 or below) the default of `40` therefore restricts counting to the
+  overlapping, double-observed part of each merged read. Lower it (e.g. `--base_qual 30`) to count the full read length.
 - `--min_flank` (default `2`): minimum distance (in nucleotides) of a mismatch or covered base from the read end. Set to `0` to disable.
 
 ### 5. Library annotation and filtering
@@ -162,15 +166,15 @@ Based on the library-filtered (and error-corrected) counts, `nf-core/deepmutscan
 
 With `--fitness`, libraries of each `sample` are grouped into a merged count table of all `input` and `output` replicates. Fitness is then estimated per replicate as the natural logarithm of each variant's output-to-input count ratio, relative to that of a synonymous wildtype proxy variant. As the proxy, the pipeline picks the synonymous variant with two nucleotide changes in one codon (or, if there is none, one nucleotide change) with the highest mean input count. Non-synonymous variants encoding the same amino acid sequence are aggregated. Per-replicate fitness values are linearly rescaled so that the median of synonymous variants is `0` and the median of stop codon variants is `-1` (if one of these anchors is missing, fitness values are only centred), and summarised as the mean and, with more than one replicate, the standard deviation across replicates.
 
-Two parameters control which variants are scored and how dropouts are treated:
+One parameter controls which variants are scored:
 
 - `--min_counts` (default `10`): minimum number of reads a variant needs in every `input` replicate to receive a fitness estimate. Variants with fewer input reads are poorly measured and are excluded. The threshold applies to each codon variant before synonymous codon variants are merged, in the same way for the default estimator, DiMSum and mutscan.
 - `--output_pseudocount` (default `1`): pseudocount added to `output` replicates in which a variant observed in the input was not detected ("dropouts"), so that strongly depleted variants still receive a finite fitness value. Set it to `0` to disable; dropout variants then receive no fitness estimate in that replicate.
 
 Two established statistical frameworks can be run on the same merged counts:
 
-- `--dimsum`: [DiMSum](https://github.com/lehner-lab/DiMSum) fitness estimates (stages 4–5 of DiMSum, without its own read processing). `--min_counts` and `--output_pseudocount` are passed on to DiMSum (`--fitnessMinInputCountAll`, `--fitnessDropoutPseudocount`).
-- `--mutscan`: [mutscan](https://github.com/fmicompbio/mutscan) enrichment estimates with edgeR and limma. Variants below `--min_counts` are removed before the analysis.
+- `--dimsum`: [DiMSum](https://github.com/lehner-lab/DiMSum) fitness estimates (stages 4–5 of DiMSum, without its own read processing). DiMSum is run on the same merged count table as the default estimator, so `--min_counts` has already been applied to its input; no DiMSum-specific count thresholds are set by the pipeline.
+- `--mutscan`: [mutscan](https://github.com/fmicompbio/mutscan) enrichment estimates with edgeR and limma, on the same merged count table.
 
 ### Interactive variant effect inspection tool (`--pdb`)
 
@@ -292,7 +296,7 @@ Some HPC setups also allow you to run nextflow within a cluster job submitted yo
 ## Nextflow memory requirements
 
 In some cases, the Nextflow Java virtual machines can start to request a large amount of memory.
-We recommend adding the following line to your environment to limit this (typically in `~/.bashrc` or `~./bash_profile`):
+We recommend adding the following line to your environment to limit this (typically in `~/.bashrc` or `~/.bash_profile`):
 
 ```bash
 NXF_OPTS='-Xms1g -Xmx4g'
