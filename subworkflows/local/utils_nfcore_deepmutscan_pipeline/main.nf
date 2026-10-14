@@ -76,16 +76,16 @@ workflow PIPELINE_INITIALISATION {
     command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input samplesheet.csv --outdir <OUTDIR>"
 
     UTILS_NFSCHEMA_PLUGIN (
-        workflow,
-        validate_params,
-        params.help,
-        params.help_full,
-        params.show_hidden,
-        null,
-        before_text,
-        after_text,
-        command,
-        false
+        workflow,                                 // input_workflow
+        validate_params,                          // validate_params
+        "${projectDir}/nextflow_schema.json",     // parameters_schema
+        params.help,                              // help
+        params.help_full,                         // help_full
+        params.show_hidden,                       // show_hidden
+        before_text,                              // before_text
+        after_text,                               // after_text
+        command,                                  // command
+        true                                      // cli_typecast: cast CLI strings for validation
     )
 
     //
@@ -178,6 +178,32 @@ workflow PIPELINE_COMPLETION {
     FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+//
+// Params given on the command line arrive as Strings, so `--fitness false` yields the String
+// "false", which is truthy in Groovy - `if (params.fitness)` would switch fitness ON. Values set
+// in a config or a -params-file keep their real type. These two helpers accept either shape.
+// nf-schema's cast_cli_params only casts for validation; it does not change params itself.
+//
+def asBool(value) {
+    if (value == null) {
+        return false
+    }
+    if (value instanceof Boolean) {
+        return value
+    }
+    return !(value.toString().trim().toLowerCase() in ['false', '0', 'no', 'null', ''])
+}
+
+def asInt(value) {
+    if (value == null) {
+        return null
+    }
+    if (value instanceof Number) {
+        return value as int
+    }
+    return value.toString().trim() as int
+}
+
 //
 // Check and validate pipeline parameters
 //
@@ -279,27 +305,48 @@ def validateSamplesheet(metas) {
 // Generate methods description for MultiQC
 //
 def toolCitationText() {
-    // Can use ternary operators to dynamically construct based conditions, e.g. params["run_xyz"] ? "Tool (Foo et al. 2023)" : "",
-    // Uncomment function in methodsDescriptionText to render in MultiQC report
-    def citation_text = [
-            "Tools used in the workflow included:",
-            "FastQC (Andrews 2010),",
-            "MultiQC (Ewels et al. 2016)",
-            "."
-        ].join(' ').trim()
+    // Only the tools this run actually used, so the methods text matches the command line.
+    def citations = [
+        "Tools used in the workflow included:",
+        "FastQC (Andrews 2010),",
+        "BWA-MEM (Li 2013),",
+        "SAMtools (Danecek et al. 2021),",
+        "VSEARCH (Rognes et al. 2016),",
+        "pysam (Heger et al.),",
+        "Polars (Vink et al.),",
+        "Biopython (Cock et al. 2009),",
+        "Biostrings (Pages et al.),",
+        asBool(params.dimsum) ? "DiMSum (Faure et al. 2020)," : "",
+        asBool(params.mutscan) ? "mutscan (Soneson et al. 2023)," : "",
+        asBool(params.mutscan) ? "edgeR (Robinson et al. 2010)," : "",
+        asBool(params.mutscan) ? "limma (Ritchie et al. 2015)," : "",
+        params.pdb ? "3Dmol.js (Rego and Koes 2015)," : "",
+        "MultiQC (Ewels et al. 2016)",
+        "."
+    ]
 
-    return citation_text
+    return citations.findAll { entry -> entry != "" }.join(' ').trim()
 }
 
 def toolBibliographyText() {
-    // Can use ternary operators to dynamically construct based conditions, e.g. params["run_xyz"] ? "<li>Author (2023) Pub name, Journal, DOI</li>" : "",
-    // Uncomment function in methodsDescriptionText to render in MultiQC report
-    def reference_text = [
-            "<li>Andrews S, (2010) FastQC, URL: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/).</li>",
-            "<li>Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics , 32(19), 3047–3048. doi: /10.1093/bioinformatics/btw354</li>"
-        ].join(' ').trim()
+    def references = [
+        "<li>Andrews S, (2010) FastQC, URL: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/.</li>",
+        "<li>Li H. (2013) Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM. arXiv:1303.3997. doi: 10.48550/arXiv.1303.3997</li>",
+        "<li>Danecek P, Bonfield JK, Liddle J, et al. (2021) Twelve years of SAMtools and BCFtools. Gigascience, 10(2), giab008. doi: 10.1093/gigascience/giab008</li>",
+        "<li>Rognes T, Flouri T, Nichols B, Quince C, Mahe F. (2016) VSEARCH: a versatile open source tool for metagenomics. PeerJ, 4, e2584. doi: 10.7717/peerj.2584</li>",
+        "<li>Heger A, Jacobs K, et al. pysam: a Python module for reading, manipulating and writing genomic data sets. URL: https://github.com/pysam-developers/pysam</li>",
+        "<li>Vink R, et al. Polars: a lightning-fast DataFrame library for Rust and Python. URL: https://github.com/pola-rs/polars</li>",
+        "<li>Cock PJ, Antao T, Chang JT, et al. (2009) Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics, 25(11), 1422-1423. doi: 10.1093/bioinformatics/btp163</li>",
+        "<li>Pages H, Aboyoun P, Gentleman R, DebRoy S. Biostrings: efficient manipulation of biological strings. R package. doi: 10.18129/B9.bioc.Biostrings</li>",
+        asBool(params.dimsum) ? "<li>Faure AJ, Schmiedel JM, Baeza-Centurion P, Lehner B. (2020) DiMSum: an error model and pipeline for analyzing deep mutational scanning data and diagnosing common experimental pathologies. Genome Biology, 21(1), 207. doi: 10.1186/s13059-020-02091-3</li>" : "",
+        asBool(params.mutscan) ? "<li>Soneson C, Bendel AM, Diss G, Stadler MB. (2023) mutscan - a flexible R package for efficient end-to-end analysis of multiplexed assays of variant effect data. Genome Biology, 24(1), 132. doi: 10.1186/s13059-023-02967-0</li>" : "",
+        asBool(params.mutscan) ? "<li>Robinson MD, McCarthy DJ, Smyth GK. (2010) edgeR: a Bioconductor package for differential expression analysis of digital gene expression data. Bioinformatics, 26(1), 139-140. doi: 10.1093/bioinformatics/btp616</li>" : "",
+        asBool(params.mutscan) ? "<li>Ritchie ME, Phipson B, Wu D, et al. (2015) limma powers differential expression analyses for RNA-sequencing and microarray studies. Nucleic Acids Research, 43(7), e47. doi: 10.1093/nar/gkv007</li>" : "",
+        params.pdb ? "<li>Rego N, Koes D. (2015) 3Dmol.js: molecular visualization with WebGL. Bioinformatics, 31(8), 1322-1324. doi: 10.1093/bioinformatics/btu829</li>" : "",
+        "<li>Ewels, P., Magnusson, M., Lundin, S., & Kaller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics, 32(19), 3047-3048. doi: 10.1093/bioinformatics/btw354</li>"
+    ]
 
-    return reference_text
+    return references.findAll { entry -> entry != "" }.join(' ').trim()
 }
 
 def methodsDescriptionText(mqc_methods_yaml) {
