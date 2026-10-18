@@ -9,7 +9,7 @@ Initial release of nf-core/deepmutscan, created with the [nf-core](https://nf-co
 
 ### `Added`
 
-- Samplesheet input of paired-end FASTQ files per library, annotated with `sample`, `type` (`input`, `output`, `wildtype`) and `replicate`
+- Samplesheet input of paired-end FASTQ files per library, annotated with `sample`, `type` (`input`, `output`, `wildtype`) and `replicate`, validated at start-up (one sample per run, unique `sample`/`type`/`replicate`, matching `input` and `output` replicate numbers, one `wildtype` library for `--error_correction wildtype`), together with `--reading_frame` against the reference
 - Raw read QC with FastQC and MultiQC
 - Read alignment to a gene-sized reference ORF with BWA-MEM (`--fasta`, `--reading_frame`)
 - Filtering of unmapped, secondary, low mapping-quality (MAPQ < 30) and indel-containing alignments with samtools; wildtype reads are retained for error correction

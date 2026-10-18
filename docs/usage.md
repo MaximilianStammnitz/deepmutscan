@@ -28,15 +28,17 @@ ORF1,output,1,/reads/output1_R1.fastq.gz,/reads/output1_R2.fastq.gz
 ORF1,output,2,/reads/output2_R1.fastq.gz,/reads/output2_R2.fastq.gz
 ```
 
-| Column      | Description                                                                                                                                                                                                   |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`    | Name of the biological sample or experiment (e.g. the gene or condition). Must not contain spaces or `/`. Rows with the same `sample` are grouped for fitness estimation and for `wildtype` error correction. |
-| `type`      | Role of the library: `input` (before selection), `output` (after selection) or `wildtype` (deep sequencing of the unmutated template, used by `--error_correction wildtype`).                                 |
-| `replicate` | Replicate number (positive integer). For fitness estimation, `input` and `output` libraries are paired in order of their replicate numbers, so please number replicates consecutively (1, 2, 3, …).           |
-| `file1`     | Full path to the FASTQ file for read 1, with extension `.fastq.gz`, `.fq.gz`, `.fastq` or `.fq`.                                                                                                              |
-| `file2`     | Full path to the FASTQ file for read 2, with extension `.fastq.gz`, `.fq.gz`, `.fastq` or `.fq`.                                                                                                              |
+| Column      | Description                                                                                                                                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sample`    | Name of the biological sample or experiment (e.g. the gene or condition). Must not contain spaces or `/`. As of v1.0.0, all rows of a samplesheet must have the same `sample`; analyse several samples in separate runs. |
+| `type`      | Role of the library: `input` (before selection), `output` (after selection) or `wildtype` (deep sequencing of the unmutated template, used by `--error_correction wildtype`).                                            |
+| `replicate` | Replicate number (positive integer). For fitness estimation, `input` and `output` libraries are paired by replicate number, so both need the same replicate numbers (e.g. 1, 2, 3).                                      |
+| `file1`     | Full path to the FASTQ file for read 1, with extension `.fastq.gz`, `.fq.gz`, `.fastq` or `.fq`.                                                                                                                         |
+| `file2`     | Full path to the FASTQ file for read 2, with extension `.fastq.gz`, `.fq.gz`, `.fastq` or `.fq`. As of v1.0.0, paired-end reads are required.                                                                            |
 
-Each library gets an internal identifier `<sample>_<type>_<replicate>_pe`, which is used to name its output files and folders.
+Each combination of `sample`, `type` and `replicate` may appear only once. Each library gets an internal identifier `<sample>_<type>_<replicate>_pe`, which is used to name its output files and folders.
+
+The samplesheet is checked when the pipeline starts, and the run stops with an error message naming the problem if, for example, a file is missing, a row is duplicated or the replicate numbers of `input` and `output` libraries do not match.
 
 ## Reference and reading frame
 
@@ -142,7 +144,7 @@ Sequencing errors occur at typically low, but position- and substitution-specifi
 - `false_doubles` (**default**): the library only contains single-codon changes, so reads carrying a programmed multi-nucleotide codon variant plus an unprogrammed single-nucleotide change in a nearby codon ("false double mutants") reveal the sequencing error rate of that single-nucleotide change. The error rate is estimated for every single-nucleotide variant from these read-linked observations within `--false_doubles_codon_window` codons (default `40`), and the expected number of erroneous counts is subtracted. No extra data are required. If a library contains too few false double mutants to model their coverage along the read (e.g. very small or shallow libraries), no correction is applied and a warning is written to the log. Two estimators are available via `--false_doubles_method`:
   - `mle` (**default**): a per-variant maximum-likelihood error rate.
   - `eb`: an empirical-Bayes estimate that shrinks the per-variant rate towards the mean of its substitution class. It is steadier for sparsely observed variants, e.g. in shallowly sequenced libraries.
-- `wildtype`: subtracts the variant-specific background measured by **additional deep sequencing of the unmutated template** from every library variant. Add these libraries to the samplesheet with `type` set to `wildtype` and the same `sample` name as the libraries they should correct. The pipeline stops with an error if a `sample` has no `wildtype` library. In this mode, the `wildtype` libraries themselves are not included in the library QC and fitness outputs.
+- `wildtype`: subtracts the variant-specific background measured by **additional deep sequencing of the unmutated template** from every library variant. Add these libraries to the samplesheet with `type` set to `wildtype` and the same `sample` name as the libraries they should correct. Exactly one `wildtype` library is supported; the pipeline stops with an error if there is none or more than one. In this mode, the `wildtype` libraries themselves are not included in the library QC and fitness outputs.
 - `none`: no correction; counts are used as observed.
 
 Corrected counts are used for every count-dependent step downstream (count heatmaps, positional QC and fitness). The uncorrected tables are kept next to the corrected ones, and an interactive HTML report shows the effect of the correction across all libraries of the run.

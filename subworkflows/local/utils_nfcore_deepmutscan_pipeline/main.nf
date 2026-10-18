@@ -10,6 +10,7 @@
 
 include { UTILS_NFSCHEMA_PLUGIN     } from '../../nf-core/utils_nfschema_plugin'
 include { paramsSummaryMap          } from 'plugin/nf-schema'
+include { samplesheetToList         } from 'plugin/nf-schema'
 include { completionEmail           } from '../../nf-core/utils_nfcore_pipeline'
 include { completionSummary         } from '../../nf-core/utils_nfcore_pipeline'
 include { UTILS_NFCORE_PIPELINE     } from '../../nf-core/utils_nfcore_pipeline'
@@ -102,39 +103,24 @@ workflow PIPELINE_INITIALISATION {
     //
     // Create channel from input file provided through params.input
     //
-
-    Channel
-    .fromPath(params.input)
-    .splitCsv(header: true)
-    .filter { row ->
-        // Skip rows where file1 or file2 are BAM files
-        !(row.file1.endsWith('.bam') || (row.file2 && row.file2.endsWith('.bam')))
-    }
-    .map { row ->
-        // Determine suffix based on the presence of file2
-        def suffix = row.file2 ? "_pe" : "_se"
-
-        // Construct metadata object with updated ID
-        def meta = [
-            id        : "${row.sample}_${row.type}_${row.replicate}${suffix}", // Base ID with suffix
-            sample    : row.sample,
-            type      : row.type,
-            replicate : row.replicate as int
-        ]
-
-        // Generate file paths based on the presence of file1 and file2
-        def reads = []
-        if (row.file1) {
-            reads << row.file1 // Add file1 path
-        }
-        if (row.file2) {
-            reads << row.file2 // Add file2 path
+    // samplesheetToList() reads the samplesheet with assets/schema_input.json: every row is
+    // validated (FASTQ extensions, both reads present, allowed types, no duplicate
+    // sample/type/replicate) and file paths are returned as file objects.
+    //
+    def samplesheet_rows = samplesheetToList(input, "${projectDir}/assets/schema_input.json")
+        .collect { meta, file1, file2 ->
+            def new_meta = [
+                id        : "${meta.sample}_${meta.type}_${meta.replicate}_pe".toString(),
+                sample    : meta.sample,
+                type      : meta.type,
+                replicate : meta.replicate as int
+            ]
+            [ new_meta, [ file1, file2 ] ]
         }
 
-        // Return metadata and file paths as a tuple
-        return [meta, reads]
-    }
-    .set { ch_samplesheet }
+    validateSamplesheet(samplesheet_rows.collect { row -> row[0] })
+
+    ch_samplesheet = channel.fromList(samplesheet_rows)
 
     // Emit the samplesheet channel and an empty version channel for use in the workflow
     emit:
@@ -197,22 +183,99 @@ workflow PIPELINE_COMPLETION {
 //
 def validateInputParameters() {
     genomeExistsError()
+    readingFrameError()
+    customCodonLibraryError()
 }
 
 //
-// Validate channels from input samplesheet
+// Check that --reading_frame covers whole codons and lies within the reference FASTA
 //
-def validateInputSamplesheet(input) {
-    def (metas, fastqs) = input[1..2]
+def readingFrameError() {
+    if (!params.reading_frame || !params.fasta) {
+        return  // both are required parameters; the schema validation reports them if missing
+    }
+    def (start, stop) = params.reading_frame.tokenize('-').collect { coord -> coord as long }
+    if (start < 1 || stop < start) {
+        error("[--reading_frame ${params.reading_frame}] The reading frame must be given as 'start-stop' with 1 <= start <= stop (1-based, inclusive).")
+    }
+    def length = stop - start + 1
+    if (length % 3 != 0) {
+        error("[--reading_frame ${params.reading_frame}] The reading frame spans ${length} nucleotides, which is not a multiple of 3. 'start' must be the first nucleotide of the first codon and 'stop' the last nucleotide of the last codon.")
+    }
+    def fasta_length = fastaSequenceLength(params.fasta)
+    if (stop > fasta_length) {
+        error("[--reading_frame ${params.reading_frame}] The reading frame ends at nucleotide ${stop}, but the reference sequence in '--fasta' is only ${fasta_length} nucleotides long.")
+    }
+}
 
-    // Check that multiple runs of the same sample are of the same datatype i.e. single-end / paired-end
-    def endedness_ok = metas.collect{ meta -> meta.single_end }.unique().size == 1
-    if (!endedness_ok) {
-        error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
+//
+// Length of the (first) sequence in a FASTA file, plain or gzipped
+//
+def fastaSequenceLength(fasta_path) {
+    def fasta  = file(fasta_path, checkIfExists: true)
+    def stream = fasta.name.endsWith('.gz') ? new java.util.zip.GZIPInputStream(fasta.newInputStream()) : fasta.newInputStream()
+    def length = 0L
+    def n_records = 0
+    stream.withReader { reader ->
+        reader.eachLine { line ->
+            if (line.startsWith('>')) {
+                n_records += 1
+            } else if (n_records == 1) {
+                length += line.trim().length()
+            }
+        }
+    }
+    return length
+}
+
+//
+// '--mutagenesis_type custom' needs a custom codon library
+//
+def customCodonLibraryError() {
+    if (params.mutagenesis_type == 'custom' && (!params.custom_codon_library || params.custom_codon_library == '/NULL')) {
+        error("[--mutagenesis_type custom] Please provide the custom codon library with '--custom_codon_library <file.csv>'.")
+    }
+}
+
+//
+// Check the samplesheet as a whole (row-level checks are done by assets/schema_input.json)
+//
+def validateSamplesheet(metas) {
+    // One biological sample per run
+    def samples = metas.collect { meta -> meta.sample }.unique()
+    if (samples.size() > 1) {
+        error("[samplesheet] nf-core/deepmutscan v1.0.0 supports one biological sample per run (found: ${samples.join(', ')}). Please split the samplesheet and run the pipeline once per sample.")
     }
 
-    return [ metas[0], fastqs ]
+    // Fitness estimation pairs input and output libraries by replicate number
+    if (params.fitness) {
+        def input_reps  = metas.findAll { meta -> meta.type == 'input'  }.collect { meta -> meta.replicate }.sort()
+        def output_reps = metas.findAll { meta -> meta.type == 'output' }.collect { meta -> meta.replicate }.sort()
+        if (!input_reps || !output_reps) {
+            error("[--fitness] Fitness estimation needs at least one 'input' and one 'output' library in the samplesheet (found ${input_reps.size()} input and ${output_reps.size()} output).")
+        }
+        if (input_reps != output_reps) {
+            error("[--fitness] The 'input' and 'output' libraries must have the same replicate numbers, as they are paired by replicate (input: ${input_reps.join(', ')}; output: ${output_reps.join(', ')}).")
+        }
+    }
+
+    // '--error_correction wildtype' needs exactly one wildtype library
+    if (params.error_correction == 'wildtype') {
+        def n_wildtype = metas.count { meta -> meta.type == 'wildtype' }
+        if (n_wildtype == 0) {
+            error(
+                "[--error_correction wildtype] No 'wildtype' library found in the samplesheet.\n" +
+                "  Add a samplesheet row with type 'wildtype' and sample '${samples[0]}' (deep wildtype-only sequencing),\n" +
+                "  or use the internal correction instead (default: --error_correction false_doubles),\n" +
+                "  or disable error correction with --error_correction none."
+            )
+        }
+        if (n_wildtype > 1) {
+            error("[--error_correction wildtype] Found ${n_wildtype} 'wildtype' libraries in the samplesheet; exactly one is supported. Please keep one wildtype library (e.g. the deepest-sequenced one).")
+        }
+    }
 }
+
 //
 // Get attribute from genome config file e.g. fasta
 //

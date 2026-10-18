@@ -78,27 +78,8 @@ workflow DEEPMUTSCAN {
         log.warn("'--dimsum true' only works together with '--fitness true'. DiMSum will be skipped.")
     }
 
-    // '--error_correction wildtype' needs a 'wildtype' sample for every biological sample
-    if (params.error_correction == 'wildtype') {
-        ch_samplesheet
-            .map { meta, _reads -> tuple(meta.sample as String, meta.type as String) }
-            .toList()
-            .map { pairs ->
-                pairs.groupBy { it[0] }.each { sample, rows ->
-                    def types = rows.collect { it[1] }
-                    if (types.any { it != 'wildtype' } && !types.contains('wildtype')) {
-                        error(
-                            "[--error_correction wildtype] No 'wildtype' sample found for '${sample}' in the samplesheet.\n" +
-                            "  Add a samplesheet row with type 'wildtype' and sample '${sample}' (deep wildtype-only sequencing),\n" +
-                            "  or use the internal correction instead (default: --error_correction false_doubles),\n" +
-                            "  or disable error correction with --error_correction none."
-                        )
-                    }
-                }
-                pairs
-            }
-            .subscribe { }
-    }
+    // Samplesheet-level checks (one sample per run, replicate pairing, one wildtype library for
+    // '--error_correction wildtype') run at start-up in PIPELINE_INITIALISATION.
 
     // Nudge fitness users who did not supply a structure towards the interactive tool
     if (params.fitness && !params.pdb) {
