@@ -1,4 +1,7 @@
-lint: {}
+lint:
+  files_exist:
+    - conf/igenomes.config
+    - conf/igenomes_ignored.config
 nf_core_version: 4.1.0
 repository_type: pipeline
 template:
@@ -9,4 +12,6 @@ template:
   name: deepmutscan
   org: nf-core
   outdir: .
+  skip_features:
+    - igenomes
   version: 1.0.0
