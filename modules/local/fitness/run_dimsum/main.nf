@@ -33,6 +33,7 @@ process RUN_DIMSUM {
       --startStage 4 \
       --stopStage 5 \
       --fitnessErrorModel F \
+      --mixedSubstitutions T \
       --fitnessMinInputCountAll ${min_counts} \
       --fitnessDropoutPseudocount ${output_pseudocount} \
       --retainIntermediateFiles T \
