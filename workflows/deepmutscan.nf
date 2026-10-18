@@ -194,8 +194,6 @@ workflow DEEPMUTSCAN {
 
     // Anchor (N items; one per sample)
     def ch_vc = VARIANTCOUNTING.out.variant_counts   // tuple(val(meta), path)
-    // Same table before --min_counts was applied; only the error correction uses it (see below)
-    def ch_vc_prefilter = VARIANTCOUNTING.out.variant_counts_prefilter
 
     // Build per-sample inputs using inline combinations (replaces fanout)
     def ch_possible_mut_for_proc = DMSANALYSIS_POSSIBLE_MUTATIONS.out.possible_mutations.map { it[1] }.combine(ch_vc).map { it[0] }
@@ -221,10 +219,8 @@ workflow DEEPMUTSCAN {
     // picks up correction via the `counts_corrected` column, count heatmaps via canonical names.
     //
     if (params.error_correction == 'false_doubles') {
-      // per sample: genuinely pre-filter counts + library-filtered counts + completed library table.
-      // The estimator reads its error rate off variants seen only once or twice, which is exactly
-      // what --min_counts removes, so this must be the pre-filter table and not ch_vc.
-      def ch_fd_in       = ch_vc_prefilter.join(variantCounts_filtered_by_library_ch).join(library_completed_variantCounts_ch)  // (meta, raw, filtered, completed)
+      // per sample: counts + library-filtered counts + completed library table
+      def ch_fd_in       = ch_vc.join(variantCounts_filtered_by_library_ch).join(library_completed_variantCounts_ch)  // (meta, raw, filtered, completed)
       def aa_seq_for_ec  = DMSANALYSIS_AASEQ.out.aa_seq.map { it[1] }.combine(ch_fd_in).map { it[0] }
       // the reference the reads were aligned to (base_mut is in this fasta's coordinate frame),
       // broadcast one-per-sample; the estimator and the mode/window are run-level constants.

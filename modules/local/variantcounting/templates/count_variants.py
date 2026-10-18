@@ -424,7 +424,6 @@ class args:
     threads    = max(1, int("$task.cpus"))
     batch_size = 5000
     out_file   = "${meta.id}.variant_counts.tsv"
-    prefilter_file = "${meta.id}.variant_counts_prefilter.tsv"
 
 #-- main execution --#
 if __name__ == "__main__":
@@ -526,15 +525,9 @@ if __name__ == "__main__":
         .sort(["sort_pos", "base_mut"], nulls_last = True)
         .drop("sort_pos") )
 
-    # The pre-filter table, written before --min_counts is applied. The false-doubles error
-    # correction estimates its error rate from exactly the low-count variants that min_counts
-    # removes (false doubles are typically seen 1-2 times), so feeding it the filtered table
-    # would starve the estimator and silently fall through to its no-op guard.
+    # --min_counts is applied at the fitness stage, not here, so the error correction
+    # always sees every false double (they are typically observed only once or twice).
     # GATK variantCounts has no header line
-    df_variants_counts.write_csv(args.prefilter_file, separator = "\\t", include_header = False)
-
-    # matches GATK --min-variant-obs
-    df_variants_counts = df_variants_counts.filter(pl.col("counts") >= args.min_counts)
     df_variants_counts.write_csv(args.out_file, separator = "\\t", include_header = False)
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Done.", flush = True)
 

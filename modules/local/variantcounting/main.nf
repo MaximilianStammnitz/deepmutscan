@@ -17,7 +17,6 @@ process VARIANTCOUNTING {
 
     output:
     tuple val(meta), path("*.variant_counts.tsv")          , emit: variant_counts
-    tuple val(meta), path("*.variant_counts_prefilter.tsv"), emit: variant_counts_prefilter
     path "variant_counts_columns.tsv"                      , emit: columns
     path "versions.yml"                                    , emit: versions
 
@@ -30,7 +29,6 @@ process VARIANTCOUNTING {
     stub:
     """
     touch ${meta.id}.variant_counts.tsv
-    touch ${meta.id}.variant_counts_prefilter.tsv
     touch variant_counts_columns.tsv
 
     cat <<-END_VERSIONS > versions.yml
