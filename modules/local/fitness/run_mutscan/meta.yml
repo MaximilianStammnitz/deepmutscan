@@ -44,6 +44,9 @@ input:
         type: file
         description: Experimental design file defining replicates, conditions, and groupings for statistical analysis
         pattern: "*.{csv,txt}"
+  - - min_counts:
+        type: integer
+        description: Minimum number of reads a variant needs in every input replicate to receive a fitness estimate (`--min_counts`)
 
 output:
   - fitness_mutscan_edgeR:

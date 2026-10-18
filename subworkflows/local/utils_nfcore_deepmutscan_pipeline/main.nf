@@ -182,7 +182,6 @@ workflow PIPELINE_COMPLETION {
 // Check and validate pipeline parameters
 //
 def validateInputParameters() {
-    genomeExistsError()
     readingFrameError()
     customCodonLibraryError()
 }
@@ -232,7 +231,7 @@ def fastaSequenceLength(fasta_path) {
 // '--mutagenesis_type custom' needs a custom codon library
 //
 def customCodonLibraryError() {
-    if (params.mutagenesis_type == 'custom' && (!params.custom_codon_library || params.custom_codon_library == '/NULL')) {
+    if (params.mutagenesis_type == 'custom' && !params.custom_codon_library) {
         error("[--mutagenesis_type custom] Please provide the custom codon library with '--custom_codon_library <file.csv>'.")
     }
 }
@@ -276,31 +275,6 @@ def validateSamplesheet(metas) {
     }
 }
 
-//
-// Get attribute from genome config file e.g. fasta
-//
-def getGenomeAttribute(attribute) {
-    if (params.genomes && params.genome && params.genomes.containsKey(params.genome)) {
-        if (params.genomes[ params.genome ].containsKey(attribute)) {
-            return params.genomes[ params.genome ][ attribute ]
-        }
-    }
-    return null
-}
-
-//
-// Exit pipeline if incorrect --genome key provided
-//
-def genomeExistsError() {
-    if (params.genomes && params.genome && !params.genomes.containsKey(params.genome)) {
-        def error_string = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
-            "  Genome '${params.genome}' not found in any config files provided to the pipeline.\n" +
-            "  Currently, the available genome keys are:\n" +
-            "  ${params.genomes.keySet().join(", ")}\n" +
-            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-        error(error_string)
-    }
-}
 //
 // Generate methods description for MultiQC
 //

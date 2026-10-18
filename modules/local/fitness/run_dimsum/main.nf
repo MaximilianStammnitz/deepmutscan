@@ -12,6 +12,8 @@ process RUN_DIMSUM {
     tuple val(sample), path(counts_merged)
     path(wt_txt)
     path(exp_design)
+    val(min_counts)
+    val(output_pseudocount)
 
   output:
     path "dimsum_results**", emit: results_dir
@@ -31,6 +33,8 @@ process RUN_DIMSUM {
       --startStage 4 \
       --stopStage 5 \
       --fitnessErrorModel F \
+      --fitnessMinInputCountAll ${min_counts} \
+      --fitnessDropoutPseudocount ${output_pseudocount} \
       --retainIntermediateFiles T \
       --projectName "dimsum_results" \
       --fastqFileDir . \

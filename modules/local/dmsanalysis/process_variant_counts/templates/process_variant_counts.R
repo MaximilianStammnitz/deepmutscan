@@ -316,7 +316,7 @@ prepare_counts_data_for_counts_heatmaps(
   counts_file_path = "variantCounts_filtered_by_library.csv",
   aa_seq_file_path = "$aa_seq",
   output_csv_path = "variantCounts_for_heatmaps.csv",
-  threshold = $min_counts
+  threshold = 1  # every observed variant; fitness applies --min_counts to the input libraries
 )
 
 

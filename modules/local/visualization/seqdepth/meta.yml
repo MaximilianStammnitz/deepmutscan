@@ -29,9 +29,6 @@ input:
         type: file
         description: CSV file defining all theoretically possible mutations for the library design
         pattern: "*.{csv}"
-  - - min_counts:
-        type: integer
-        description: Minimum count threshold used in the simulation logic
 
 output:
   - SeqDepth:

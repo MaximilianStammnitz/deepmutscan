@@ -96,7 +96,9 @@ workflow CALCULATE_FITNESS {
     FITNESS_CALCULATION(
         ch_run_counts_d,
         ch_run_exp_d,
-        ch_run_wt_d
+        ch_run_wt_d,
+        params.min_counts,
+        params.output_pseudocount
     )
     ch_versions = ch_versions.mix(FITNESS_CALCULATION.out.versions)
 
@@ -122,7 +124,9 @@ workflow CALCULATE_FITNESS {
         RUN_DIMSUM(
             ch_run_counts_d,
             ch_run_wt_d,
-            ch_run_exp_d
+            ch_run_exp_d,
+            params.min_counts,
+            params.output_pseudocount
         )
         ch_versions = ch_versions.mix(RUN_DIMSUM.out.versions)
         ch_dimsum_dir = RUN_DIMSUM.out.results_dir
@@ -133,7 +137,8 @@ workflow CALCULATE_FITNESS {
         RUN_MUTSCAN(
             ch_run_counts_d,
             ch_run_wt_d,
-            ch_run_exp_d
+            ch_run_exp_d,
+            params.min_counts
         )
         ch_versions = ch_versions.mix(RUN_MUTSCAN.out.versions)
         ch_mutscan_plots = RUN_MUTSCAN.out.qc_plots

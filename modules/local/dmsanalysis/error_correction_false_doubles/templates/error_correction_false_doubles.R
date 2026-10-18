@@ -780,7 +780,7 @@ seq_error_correct_counts_for_heatmaps(
   input_csv_path = "variantCounts_filtered_by_library_error_corrected.csv",
   aa_seq_file_path = "$aa_seq",
   output_csv_path = "variantCounts_for_heatmaps_error_corrected.csv",
-  threshold = $min_counts
+  threshold = 1  # every observed variant; fitness applies --min_counts to the input libraries
 )
 
 correct_library_completed(

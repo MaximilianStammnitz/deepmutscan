@@ -421,7 +421,6 @@ class args:
     input_bam  = "$bam"
     reference  = "$fasta"
     orf_range  = "$reading_frame"          # 1-based inclusive (GATK --orf convention)
-    min_counts = int("$min_counts")
     base_qual  = int("$base_qual")
     min_flank  = int("$min_flank")
     threads    = max(1, int("$task.cpus"))
@@ -493,9 +492,6 @@ if __name__ == "__main__":
             "aa_mut": pl.Utf8,
             "pos_mut": pl.Utf8
         }, orient = "row")
-
-    # matches GATK --min-variant-obs
-    df_variants_counts = df_variants_counts.filter(pl.col("counts") >= args.min_counts)
 
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Creating the output file, please wait...", flush = True)
     df_variants_counts = df_variants_counts.select([pl.col("counts"),

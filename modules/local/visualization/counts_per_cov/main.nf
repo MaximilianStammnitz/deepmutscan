@@ -10,7 +10,6 @@ process VISUALIZATION_COUNTS_PER_COV {
 
     input:
     tuple val(meta), path(variantCounts_for_heatmaps)
-    val min_counts
 
     output:
     tuple val(meta), path("counts_per_cov_heatmap.pdf"), emit: counts_per_cov_heatmap

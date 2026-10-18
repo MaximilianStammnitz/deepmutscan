@@ -12,7 +12,6 @@ process VARIANTCOUNTING {
     tuple val(meta), path(bam), path(bai)
     path fasta
     val reading_frame
-    val min_counts
     val base_qual
     val min_flank
 

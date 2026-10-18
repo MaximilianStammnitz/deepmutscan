@@ -52,7 +52,7 @@ generate_possible_variants <- function(wt_seq_input, start_stop_pos, mutagenesis
   custom_codons <- NULL
 
   if (mutagenesis_type == "custom") {
-    if (!file.exists(custom_codon_library_path) || is.null(custom_codon_library_path)) {
+    if (is.null(custom_codon_library_path) || !file.exists(custom_codon_library_path)) {
       stop("Custom codons file must be provided and valid when using 'custom' mutagenesis_type.")
     }
 
@@ -162,9 +162,8 @@ generate_possible_variants <- function(wt_seq_input, start_stop_pos, mutagenesis
 # Main Execution Block (Nextflow variable substitution)
 # ------------------------------------------------------------------------------
 
-# Replaces bash if/else logic. If Nextflow omits the optional file,
-# it passes "/NULL", which R translates to an actual NULL object.
-custom_lib_arg <- if ("$custom_codon_library" == "/NULL") {
+# Without '--custom_codon_library', Nextflow stages no file and the path is empty.
+custom_lib_arg <- if ("$custom_codon_library" == "") {
   NULL
 } else {
   "$custom_codon_library"
@@ -174,7 +173,7 @@ generate_possible_variants(
   wt_seq_input              = "$wt_seq",
   start_stop_pos            = "$pos_range",
   mutagenesis_type          = "$mutagenesis_type",
-  custom_codon_library_path = "$custom_codon_library",
+  custom_codon_library_path = custom_lib_arg,
   output_file               = "possible_mutations.csv"
 )
 

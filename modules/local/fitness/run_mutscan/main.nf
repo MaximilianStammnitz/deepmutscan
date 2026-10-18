@@ -12,6 +12,7 @@ process RUN_MUTSCAN {
     tuple val(sample), path(counts_merged)
     path(syn_wt_txt)
     path(exp_design)
+    val(min_counts)
 
   output:
     tuple val(sample), path("fitness_estimation_mutscan_edgeR.tsv"), emit: fitness_mutscan_edgeR

@@ -32,9 +32,6 @@ input:
   - - aa_seq:
         type: file
         description: Reference amino-acid sequence (one line).
-  - - min_counts:
-        type: integer
-        description: Minimum count threshold for the amino-acid-level heatmap table.
 
 output:
   - corrected:

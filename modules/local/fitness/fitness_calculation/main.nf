@@ -12,6 +12,8 @@ process FITNESS_CALCULATION {
     tuple val(sample), path(counts_merged)
     path(exp_design)
     path(syn_wt_txt)
+    val(min_counts)
+    val(output_pseudocount)
 
   output:
     tuple val(sample), path("fitness_estimation.tsv"), emit: fitness_estimation

@@ -20,7 +20,7 @@ results/
 │   └── <sample>/
 ├── fitness/                             # fitness results, mostly only with --fitness
 │   ├── default_results/
-│   ├── DiMSum_results/                  # single_rep_counts/ always; dimsum_results/ only with --dimsum
+│   ├── DiMSum_results/                  # only with --dimsum
 │   └── mutscan_results/                 # only with --mutscan
 ├── variant_effect_inspection_tool/      # only with --fitness and --pdb
 └── pipeline_info/                       # Nextflow and pipeline run information
@@ -158,7 +158,7 @@ These plots help to judge the success of the mutagenesis (are all positions and 
     - `fitness_estimation_fitness_correlation.pdf`: pairwise fitness correlations between replicates.
     - `fitness_heatmap.pdf`: mean fitness per position (x-axis) and mutant amino acid (y-axis).
   - `DiMSum_results/`
-    - `single_rep_counts/<library>_fitness_input.tsv`: per-library count tables in DiMSum input format. These are written for every run, also without `--fitness`.
+    - `single_rep_counts/<library>_fitness_input.tsv` (with `--dimsum`): per-library count tables in DiMSum input format.
     - `dimsum_results/` (with `--dimsum`): the complete [DiMSum](https://github.com/lehner-lab/DiMSum) default output, including its HTML `report.html`, fitness tables (`fitness_singles.txt`, `fitness_doubles.txt`, `fitness_synonymous.txt`, `fitness_wildtype.txt`, `fitness_singles_MaveDB.csv`) and `.RData` objects.
   - `mutscan_results/` (with `--mutscan`)
     - `fitness_estimation_mutscan_edgeR.tsv`, `fitness_estimation_mutscan_limma.tsv`: [mutscan](https://github.com/fmicompbio/mutscan) default variant enrichment estimates with edgeR and limma.

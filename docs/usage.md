@@ -164,7 +164,7 @@ With `--fitness`, libraries of each `sample` are grouped into a merged count tab
 
 Two parameters control which variants are scored and how dropouts are treated:
 
-- `--min_counts` (default `10`): minimum number of reads a variant needs in every `input` replicate to receive a fitness estimate. Variants with fewer input reads are poorly measured and are excluded.
+- `--min_counts` (default `10`): minimum number of reads a variant needs in every `input` replicate to receive a fitness estimate. Variants with fewer input reads are poorly measured and are excluded. The threshold applies to each codon variant before synonymous codon variants are merged, in the same way for the default estimator, DiMSum and mutscan.
 - `--output_pseudocount` (default `1`): pseudocount added to `output` replicates in which a variant observed in the input was not detected ("dropouts"), so that strongly depleted variants still receive a finite fitness value. Set it to `0` to disable; dropout variants then receive no fitness estimate in that replicate.
 
 Two established statistical frameworks can be run on the same merged counts:

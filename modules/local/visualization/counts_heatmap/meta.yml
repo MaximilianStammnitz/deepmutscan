@@ -25,9 +25,6 @@ input:
         type: file
         description: CSV file containing processed variant counts formatted for heatmap generation
         pattern: "*.{csv}"
-  - - min_counts:
-        type: integer
-        description: Minimum count threshold used to filter variants before plotting
 
 output:
   - counts_heatmap:

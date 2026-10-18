@@ -101,7 +101,7 @@ SeqDepth_simulation_plot(
   curve_csv_path          = "seqdepth_curve.csv",
   first_step              = 1e-4,
   last_step               = 0.05,
-  threshold               = $min_counts
+  threshold               = 1
   )
 
 #####
