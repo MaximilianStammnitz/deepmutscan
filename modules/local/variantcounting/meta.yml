@@ -38,9 +38,6 @@ input:
   - - reading_frame:
         type: string
         description: ORF range as 1-based inclusive `start-stop` (GATK `--orf` convention), e.g. `352-1383`.
-  - - min_counts:
-        type: integer
-        description: Minimum number of observations for a variant to be reported (GATK `--min-variant-obs`).
   - - base_qual:
         type: integer
         description: Minimum base quality for a mutation to be counted.

@@ -949,7 +949,9 @@
           host.innerHTML = '<div class="empty">No heatmap data for this sample.</div>';
           return;
         }
-        const AAS = "ACDEFGHIKLMNPQRSTVWY*".split("");
+        // Amino acids grouped by side-chain chemistry (hydrophobic, aromatic, basic, acidic,
+        // polar, proline, stop), matching the order used by the R heatmap figures.
+        const AAS = "GAVLMIFYWKRHDESTCNQP*".split("");
         const cells = s.heatmap.cells;
         const maxP = Math.max(...cells.map((c) => c.p));
         const vals = cells.map((c) => c.v).filter((v) => v > 0);
@@ -1738,7 +1740,9 @@
             // fitness heatmap (diverging, fixed symmetric range)
             (function () {
               const host = document.getElementById("f-heat");
-              const AAS = "ACDEFGHIKLMNPQRSTVWY*".split("");
+              // Amino acids grouped by side-chain chemistry (hydrophobic, aromatic, basic, acidic,
+              // polar, proline, stop), matching the order used by the R heatmap figures.
+              const AAS = "GAVLMIFYWKRHDESTCNQP*".split("");
               const cells = F.cells;
               if (!cells.length) return (host.innerHTML = '<div class="empty">No fitness data.</div>');
               const maxP = Math.max(...cells.map((c) => c.p));

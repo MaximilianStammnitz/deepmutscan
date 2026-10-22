@@ -31,6 +31,12 @@ input:
         type: file
         description: DiMSum-specific experimental design file describing replicates and conditions
         pattern: "*.{txt,csv}"
+  - - min_counts:
+        type: integer
+        description: Minimum number of reads a variant needs in every input replicate to receive a fitness estimate (`--min_counts`)
+  - - output_pseudocount:
+        type: integer
+        description: Pseudocount for output replicates in which a variant observed in the input was not detected; 0 disables (`--output_pseudocount`)
 
 output:
   - results_dir:

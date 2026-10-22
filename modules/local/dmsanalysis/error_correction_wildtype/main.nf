@@ -11,7 +11,6 @@ process DMSANALYSIS_ERROR_CORRECTION_WILDTYPE {
     input:
     tuple val(meta), path(filtered, stageAs: 'input_counts.csv'), path(wt_counts, stageAs: 'wildtype_counts.csv'), path(completed)
     path aa_seq
-    val min_counts
 
     output:
     tuple val(meta),

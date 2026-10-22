@@ -26,6 +26,8 @@ workflow CALCULATE_FITNESS {
     ch_fasta            // channel: tuple([meta], path(fasta))
     val_reading_frame   // value: reading frame param
     ch_aa_seq           // channel: output from DMSANALYSIS_AASEQ (for heatmap)
+    val_run_dimsum      // value: boolean, run DiMSum
+    val_run_mutscan     // value: boolean, run mutscan
 
     main:
     ch_versions = Channel.empty()
@@ -96,7 +98,9 @@ workflow CALCULATE_FITNESS {
     FITNESS_CALCULATION(
         ch_run_counts_d,
         ch_run_exp_d,
-        ch_run_wt_d
+        ch_run_wt_d,
+        params.min_counts,
+        params.output_pseudocount
     )
     ch_versions = ch_versions.mix(FITNESS_CALCULATION.out.versions)
 
@@ -109,31 +113,30 @@ workflow CALCULATE_FITNESS {
     )
     ch_versions = ch_versions.mix(FITNESS_HEATMAP.out.versions)
 
-    // 7. Run DiMSum (optional based on params inside subworkflow or handled by control logic)
-    // Note: Logic checking for 'params.dimsum' needs to be handled.
-    // Since subworkflows inherit params, we can check params.dimsum here.
-
     // DiMSum and mutscan are optional, so their artefact channels start empty and are only filled
     // when the tool actually ran - the summary report then simply omits the section.
     def ch_dimsum_dir    = Channel.empty()
     def ch_mutscan_plots = Channel.empty()
 
-    if (params.dimsum) {
+    if (val_run_dimsum) {
         RUN_DIMSUM(
             ch_run_counts_d,
             ch_run_wt_d,
-            ch_run_exp_d
+            ch_run_exp_d,
+            params.min_counts,
+            params.output_pseudocount
         )
         ch_versions = ch_versions.mix(RUN_DIMSUM.out.versions)
         ch_dimsum_dir = RUN_DIMSUM.out.results_dir
     }
 
     // 8. Run Mutscan
-    if (params.mutscan) {
+    if (val_run_mutscan) {
         RUN_MUTSCAN(
             ch_run_counts_d,
             ch_run_wt_d,
-            ch_run_exp_d
+            ch_run_exp_d,
+            params.min_counts
         )
         ch_versions = ch_versions.mix(RUN_MUTSCAN.out.versions)
         ch_mutscan_plots = RUN_MUTSCAN.out.qc_plots

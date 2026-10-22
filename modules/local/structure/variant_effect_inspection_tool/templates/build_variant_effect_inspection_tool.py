@@ -25,7 +25,8 @@ THREE_TO_ONE = {
     "GLY": "G", "HIS": "H", "ILE": "I", "LEU": "L", "LYS": "K", "MET": "M", "PHE": "F",
     "PRO": "P", "SER": "S", "THR": "T", "TRP": "W", "TYR": "Y", "VAL": "V",
 }
-AA_ORDER = list("ACDEFGHIKLMNPQRSTVWY")
+# Grouped by side-chain chemistry, matching the heatmaps in the summary report.
+AA_ORDER = list("GAVLMIFYWKRHDESTCNQP")
 MUT_RE = re.compile(r"^([A-Z])(\\d+)([A-Z*])\$")
 
 

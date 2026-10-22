@@ -12,7 +12,6 @@ process VISUALIZATION_SEQDEPTH {
     input:
     tuple val(meta), path(variantCounts_filtered_by_library)
     path possible_mutations
-    val min_counts
 
     output:
     tuple val(meta), path("SeqDepth.pdf"), emit: SeqDepth

@@ -12,7 +12,6 @@ process DMSANALYSIS_ERROR_CORRECTION_FALSE_DOUBLES {
     tuple val(meta), path(raw_counts), path(filtered), path(completed)
     path wt_fasta
     path aa_seq
-    val min_counts
     val method
     val codon_window
 

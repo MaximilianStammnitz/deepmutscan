@@ -12,12 +12,15 @@ process RUN_DIMSUM {
     tuple val(sample), path(counts_merged)
     path(wt_txt)
     path(exp_design)
+    val(min_counts)
+    val(output_pseudocount)
 
   output:
     path "dimsum_results**", emit: results_dir
     path "versions.yml", emit: versions
 
   script:
+  def args = task.ext.args ?: ''
   """
   set -euo pipefail
 
@@ -30,15 +33,20 @@ process RUN_DIMSUM {
       --countPath "$counts_merged" \
       --startStage 4 \
       --stopStage 5 \
-      --fitnessErrorModel F \
-      --retainIntermediateFiles T \
+      --mixedSubstitutions T \
+      --fitnessMinInputCountAll ${min_counts} \
+      --fitnessDropoutPseudocount ${output_pseudocount} \
+      --numCores $task.cpus \
       --projectName "dimsum_results" \
       --fastqFileDir . \
+      $args
 
   R_VERSION=\$(R --version | head -n 1 | sed -E 's/^R version ([0-9.]+).*/\\1/')
+  DIMSUM_VERSION=\$(Rscript -e 'cat(as.character(packageVersion("DiMSum")))')
   cat <<-END_VERSIONS > versions.yml
-  DIMSUM_RUN:
-    r-base: \$R_VERSION
+  "${task.process}":
+      r-base: \$R_VERSION
+      DiMSum: \$DIMSUM_VERSION
 END_VERSIONS
   """
 
@@ -49,6 +57,7 @@ END_VERSIONS
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
       r-base: "0.0.0"
+      DiMSum: "0.0.0"
   END_VERSIONS
   """
 }

@@ -194,10 +194,16 @@ complete_prefiltered_counts <- function(possible_nnk_path, prefiltered_counts_pa
   prefiltered_counts\$codon_mut <- toupper(prefiltered_counts\$codon_mut)
   merged_data <- full_join(prefiltered_counts, possible_nnk, by = "codon_mut")
 
-  # Fill missing values in counts_per_cov and counts with 0.0000001
+  # Placeholder for variants that are part of the programmed library but were never observed, so
+  # they still occupy a slot in the count distribution plots. The two columns previously used
+  # different magnitudes (1e-7 and 1e-6) for no reason; use one constant for both.
+  # NOTE: error correction can drive an observed variant to exactly 0, which therefore ranks
+  # BELOW a never-observed variant on a log scale and can yield Inf in logdiff. Making the two
+  # consistent with each other does not resolve that; see the open question in the release notes.
+  unobserved_placeholder <- 1e-6
   merged_data <- merged_data %>%
-    mutate(counts_per_cov = ifelse(is.na(counts_per_cov), 0.0000001, counts_per_cov),
-           counts = ifelse(is.na(counts), 0.000001, counts))
+    mutate(counts_per_cov = ifelse(is.na(counts_per_cov), unobserved_placeholder, counts_per_cov),
+           counts = ifelse(is.na(counts), unobserved_placeholder, counts))
 
   # Calculate Hamming distance (varying_bases) and mutation details (aa_mut, pos_mut)
   merged_data <- merged_data %>%
@@ -316,7 +322,7 @@ prepare_counts_data_for_counts_heatmaps(
   counts_file_path = "variantCounts_filtered_by_library.csv",
   aa_seq_file_path = "$aa_seq",
   output_csv_path = "variantCounts_for_heatmaps.csv",
-  threshold = $min_counts
+  threshold = 1  # every observed variant; fitness applies --min_counts to the input libraries
 )
 
 

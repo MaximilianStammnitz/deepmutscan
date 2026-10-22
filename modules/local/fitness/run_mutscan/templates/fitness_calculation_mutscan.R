@@ -170,7 +170,7 @@ mutantName <- function(x, wt.seq){
 mutscan.summaryTable.from.counts <- function(x, sample, wt.seq){
 
   ### pre-process
-  x <- x[,c(1, grep(sample, colnames(x)))]
+  x <- x[,c(1, which(colnames(x) == sample))]
   colnames(x) <- c("sequence", "nbrReads")
   x <- cbind(x, "maxNbrReads" = x[,"nbrReads"], "nbrUmis" = x[,"nbrReads"])
 
@@ -231,7 +231,8 @@ run_mutscan_fitness_estimation <- function(counts_path,
                                            design_path,
                                            wt_seq_path,
                                            output_path_edgeR,
-                                           output_path_limma){
+                                           output_path_limma,
+                                           min_counts = 10){
 
   ## 1. Import key files ##
   #########################
@@ -239,6 +240,15 @@ run_mutscan_fitness_estimation <- function(counts_path,
   merged.counts <- read.table(counts_path, sep = "\t", header = T, check.names = F)
   exp.design <- read.table(design_path, sep = "\t", header = T, check.names = F)
   wt.seq <- DNAString(as.character(read.table(wt_seq_path)))
+
+  ## keep variants with at least `min_counts` reads in every input replicate (and the wildtype),
+  ## so that mutscan analyses the same variants as the default estimator and DiMSum
+  input.cols <- grep("^input[0-9]+\$", colnames(merged.counts), value = TRUE)
+  keep <- apply(merged.counts[, input.cols, drop = FALSE] >= min_counts, 1, all)
+  keep[is.na(keep)] <- FALSE
+  keep[merged.counts[, 1] == as.character(wt.seq)] <- TRUE
+  merged.counts <- merged.counts[keep, , drop = FALSE]
+  rm(input.cols, keep)
 
   ## 2. Variant count matrix reformatting ##
   ##########################################
@@ -274,7 +284,7 @@ run_mutscan_fitness_estimation <- function(counts_path,
   coldata <- as.data.frame(cbind("Name" = exp.design\$sample_name,
                                  "Condition" = condition,
                                  "Replicate" = exp.design\$experiment_replicate))
-  class(coldata\$Replicate) <- "integer"
+  coldata\$Replicate <- factor(coldata\$Replicate)
 
   # mutscan 'summarizeExperiment' object
   se <- summarizeExperiment(x = var.tables,
@@ -344,7 +354,8 @@ run_mutscan_fitness_estimation(
   design_path = "$exp_design",
   wt_seq_path = "$syn_wt_txt",
   output_path_edgeR = "fitness_estimation_mutscan_edgeR.tsv",
-  output_path_limma = "fitness_estimation_mutscan_limma.tsv"
+  output_path_limma = "fitness_estimation_mutscan_limma.tsv",
+  min_counts = as.numeric("$min_counts")
 )
 
 ####

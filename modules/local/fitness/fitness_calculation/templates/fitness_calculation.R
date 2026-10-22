@@ -110,6 +110,17 @@ aggregate_by_aa <- function(merged.counts) {
   merged.counts
 }
 
+# keep nucleotide variants with at least `min_counts` reads in every input replicate, before
+# synonymous codons are merged - the same filter as DiMSum's '--fitnessMinInputCountAll'
+# (the wildtype is always kept, as it anchors every fitness estimate)
+filter_low_input_counts <- function(merged.counts, wt.seq, min_counts) {
+  input.cols <- grep("^input[0-9]+\$", colnames(merged.counts), value = TRUE)
+  keep <- apply(merged.counts[, input.cols, drop = FALSE] >= min_counts, 1, all)
+  keep[is.na(keep)] <- FALSE
+  keep[merged.counts\$nt_seq == as.character(wt.seq)] <- TRUE
+  merged.counts[keep, , drop = FALSE]
+}
+
 # calculate bimodal fitness distribution
 density_peaks <- function(x, adjust = 1, ...) {
 
@@ -127,7 +138,7 @@ density_peaks <- function(x, adjust = 1, ...) {
 }
 
 # 3. Raw fitness calculations ##
-calc_raw_fitness <- function(merged.counts, exp.design) {
+calc_raw_fitness <- function(merged.counts, exp.design, output_pseudocount) {
   ## how many fitness replicates are there
   reps <- length(unique(exp.design\$experiment_replicate))
   for (i in 1:reps){
@@ -142,8 +153,14 @@ calc_raw_fitness <- function(merged.counts, exp.design) {
     tmp.input.counts <- merged.counts[,paste0("input", i)]
     tmp.output.counts <- merged.counts[,paste0("output", i)]
 
-    ### add pseudo-count to zero-outputs (if the corresponding input count is non-zero)
-    tmp.output.counts[which(tmp.output.counts == 0 & tmp.input.counts != 0)] <- 1
+    ### dropouts (zero output count, non-zero input count): add the output pseudocount,
+    ### or leave them without a fitness estimate in this replicate if it is 0
+    tmp.dropout <- which(tmp.output.counts == 0 & tmp.input.counts != 0)
+    if (output_pseudocount > 0) {
+      tmp.output.counts[tmp.dropout] <- output_pseudocount
+    } else {
+      tmp.output.counts[tmp.dropout] <- NA
+    }
 
     ### take logs
     tmp.wt.log.ratio <- log(tmp.output.counts[which(merged.counts\$wt == TRUE)] /
@@ -159,7 +176,7 @@ calc_raw_fitness <- function(merged.counts, exp.design) {
     merged.counts[,c(ncol(merged.counts) - reps + i)] <- tmp.fitness
 
     ### clean up
-    rm(tmp.fitness, tmp.wt.log.ratio, tmp.output.counts, tmp.input.counts)
+    rm(tmp.fitness, tmp.wt.log.ratio, tmp.output.counts, tmp.input.counts, tmp.dropout)
   }
 
   list(merged.counts = merged.counts, reps = reps)
@@ -242,12 +259,16 @@ rescale_and_summarize <- function(merged.counts, reps) {
 #' @param design_path Path to experimentalDesign.tsv
 #' @param wt_seq_path Path to synonymous_wt.txt (single line DNA sequence)
 #' @param output_path Path to write fitness_estimation.tsv
+#' @param min_counts Minimum number of reads in every input replicate for a fitness estimate
+#' @param output_pseudocount Pseudocount for output dropouts (0 = no estimate for dropouts)
 #'
 #' @return Invisibly returns the final data.frame; writes the output to output_path.
 run_fitness_estimation <- function(counts_path,
                                    design_path,
                                    wt_seq_path,
-                                   output_path) {
+                                   output_path,
+                                   min_counts = 10,
+                                   output_pseudocount = 1) {
   ## 1. Import key files ##
   #########################
 
@@ -258,6 +279,9 @@ run_fitness_estimation <- function(counts_path,
 
   ## 2. Pre-processing the count table ##
   #######################################
+
+  ## keep variants with at least `min_counts` reads in every input replicate
+  merged.counts <- filter_low_input_counts(merged.counts, wt.seq, min_counts)
 
   ## calculate nt hamming distances from the specified WT
   merged.counts <- compute_nt_hamming(merged.counts, wt.seq)
@@ -276,7 +300,7 @@ run_fitness_estimation <- function(counts_path,
 
   ## 3. Raw fitness calculations ##
   #################################
-  fitness_res <- calc_raw_fitness(merged.counts, exp.design)
+  fitness_res <- calc_raw_fitness(merged.counts, exp.design, output_pseudocount)
   merged.counts <- fitness_res\$merged.counts
   reps <- fitness_res\$reps
 
@@ -334,7 +358,9 @@ run_fitness_estimation(
   counts_path = "$counts_merged",
   design_path = "$exp_design",
   wt_seq_path = "$syn_wt_txt",
-  output_path = "fitness_estimation.tsv"
+  output_path = "fitness_estimation.tsv",
+  min_counts = as.numeric("$min_counts"),
+  output_pseudocount = as.numeric("$output_pseudocount")
 )
 
 ####

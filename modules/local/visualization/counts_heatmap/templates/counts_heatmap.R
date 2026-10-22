@@ -158,7 +158,7 @@ counts_heatmap <- function(input_csv_path, threshold = 3, output_pdf_path, img_f
 #####
 counts_heatmap(
   input_csv_path = "$variantCounts_for_heatmaps",
-  threshold = $min_counts,
+  threshold = 1,
   output_pdf_path = "counts_heatmap.pdf",
   img_format = "pdf"
 )
