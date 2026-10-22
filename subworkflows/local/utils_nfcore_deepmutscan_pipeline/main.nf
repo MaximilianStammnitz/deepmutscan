@@ -119,6 +119,7 @@ workflow PIPELINE_INITIALISATION {
         }
 
     validateSamplesheet(samplesheet_rows.collect { row -> row[0] })
+    validateInputFiles(samplesheet_rows)
 
     ch_samplesheet = channel.fromList(samplesheet_rows)
 
@@ -302,12 +303,132 @@ def validateSamplesheet(metas) {
 }
 
 //
+// Quick start-up checks of the input FASTQ files, before any process runs. Reads only the first
+// record of each file, so it takes a moment even for remote files. The complete files are checked
+// by FASTQ_CHECK (fq lint) at the start of the workflow. All problems are reported together.
+//
+def validateInputFiles(rows) {
+    def problems = []
+
+    // Each FASTQ file belongs to one library only, and file1 and file2 are different files
+    def libraries_per_file = [:]
+    rows.each { row ->
+        def meta  = row[0]
+        def reads = row[1]
+        reads.each { fastq ->
+            def key = fastq.toUriString()
+            libraries_per_file[key] = (libraries_per_file[key] ?: []) + [meta.id]
+        }
+        if (reads[0].toUriString() == reads[1].toUriString()) {
+            problems << "${meta.id}: file1 and file2 are the same file (${reads[0].name})."
+        }
+    }
+    libraries_per_file.each { path, ids ->
+        def unique_ids = ids.unique(false)
+        if (unique_ids.size() > 1) {
+            problems << "${path.tokenize('/')[-1]} is used by more than one library (${unique_ids.join(', ')})."
+        }
+    }
+
+    // The first record of each file is a valid FASTQ record, and the two files are mates
+    rows.each { row ->
+        def meta  = row[0]
+        def reads = row[1]
+        def first = reads.collect { fastq -> firstFastqRecord(fastq) }
+        first.eachWithIndex { record, i ->
+            if (record.error) {
+                problems << "${meta.id}: file${i + 1} ${reads[i].name} ${record.error}"
+            }
+        }
+        def same_file = reads[0].toUriString() == reads[1].toUriString()
+        if (!same_file && !first[0].error && !first[1].error) {
+            if (first[0].lines == first[1].lines) {
+                problems << "${meta.id}: file1 and file2 start with an identical read (${first[0].name}). The same reads seem to be given twice under two file names."
+            } else if (first[0].name != first[1].name) {
+                problems << "${meta.id}: the first reads of file1 and file2 have different names (${first[0].name} vs ${first[1].name}). Either the mates are not in the same order (re-pair them with 'seqkit pair' (https://github.com/shenwei356/seqkit) or BBTools 'repair.sh' (https://github.com/bbushnell/BBTools)), or the two files do not belong to the same library."
+            }
+        }
+    }
+
+    if (problems) {
+        error(
+            "[samplesheet] Problems with the input FASTQ files:\n" +
+            problems.collect { problem -> "  - ${problem}" }.join('\n') +
+            "\n  Please check these files (e.g. re-download or re-copy them and compare checksums) and the samplesheet."
+        )
+    }
+}
+
+//
+// First FASTQ record of a file (plain or gzipped): [lines: first 4 lines, name: read name] or
+// [error: description of what is wrong]
+//
+def firstFastqRecord(fastq) {
+    def lines = []
+    try {
+        def raw    = fastq.newInputStream()
+        def stream = fastq.name.endsWith('.gz') ? new java.util.zip.GZIPInputStream(raw) : raw
+        stream.withReader { reader ->
+            (1..4).each { _i ->
+                def line = reader.readLine()
+                if (line != null) {
+                    lines << line
+                }
+            }
+        }
+    } catch (java.util.zip.ZipException e) {
+        return [error: "is named '.gz' but is not a valid gzip file (${e.message})."]
+    } catch (java.io.EOFException _e) {
+        return [error: "is empty, or ends before its first read (truncated)."]
+    } catch (Exception e) {
+        return [error: "could not be read (${e.class.simpleName}: ${e.message})."]
+    }
+    if (!lines) {
+        return [error: "contains no reads."]
+    }
+    if (!lines[0].startsWith('@')) {
+        return [error: "is not in FASTQ format: the first line should start with '@', but starts with '${lines[0].take(20)}'."]
+    }
+    if (lines.size() < 4 || !lines[2].startsWith('+') || lines[1].length() != lines[3].length()) {
+        return [error: "is not in FASTQ format: its first record is incomplete, or the sequence and quality lines differ in length."]
+    }
+    // Read name without the '@', anything after the first space and a trailing /1 or /2
+    def name = lines[0].substring(1).tokenize(' \t')[0].replaceAll('/[12]$', '')
+    return [lines: lines, name: name]
+}
+
+//
+// Results of FASTQ_CHECK (fq lint over each complete read pair): stop the run with one message
+// listing every library that failed, otherwise log a short summary
+//
+def checkFastqReports(rows) {
+    def results = rows.collect { row ->
+        def meta   = row[0]
+        def fields = row[2].text.trim().tokenize('\t')
+        [id: meta.id, status: fields[0], detail: fields.size() > 1 ? fields[1] : '']
+    }
+    def failed = results.findAll { result -> result.status != 'PASS' }
+    if (failed) {
+        error(
+            "[FASTQ check] ${failed.size()} of ${results.size()} libraries have faulty input FASTQ files:\n" +
+            failed.collect { result -> "  - ${result.id}: ${result.detail}" }.join('\n') +
+            "\n  Please replace these files (e.g. re-download or re-copy them and compare checksums) and run the pipeline again."
+        )
+    }
+    if (results) {
+        log.info("[FASTQ check] The input FASTQ files of all ${results.size()} libraries are complete and consistent.")
+    }
+    return rows
+}
+
+//
 // Generate methods description for MultiQC
 //
 def toolCitationText() {
     // Only the tools this run actually used, so the methods text matches the command line.
     def citations = [
         "Tools used in the workflow included:",
+        "fq (St. Jude Rust Labs),",
         "FastQC (Andrews 2010),",
         "BWA-MEM (Li 2013),",
         "SAMtools (Danecek et al. 2021),",
@@ -330,6 +451,7 @@ def toolCitationText() {
 
 def toolBibliographyText() {
     def references = [
+        "<li>St. Jude Rust Labs. fq: FASTQ file manipulation and validation. URL: https://github.com/stjude-rust-labs/fq</li>",
         "<li>Andrews S, (2010) FastQC, URL: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/.</li>",
         "<li>Li H. (2013) Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM. arXiv:1303.3997. doi: 10.48550/arXiv.1303.3997</li>",
         "<li>Danecek P, Bonfield JK, Liddle J, et al. (2021) Twelve years of SAMtools and BCFtools. Gigascience, 10(2), giab008. doi: 10.1093/gigascience/giab008</li>",

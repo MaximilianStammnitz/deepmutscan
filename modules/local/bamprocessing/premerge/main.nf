@@ -7,11 +7,12 @@ process PREMERGE {
     container "community.wave.seqera.io/library/bwa_samtools_vsearch:28e8640725d3d8e9"
 
     input:
-    tuple val(meta), path(bam)
+    tuple val(meta), path(reads)
     tuple val(meta2), path(index)
 
     output:
-    tuple val(meta), path("*_merged.bam"), emit: bam
+    tuple val(meta), path("*.sorted.bam"), path("*.sorted.bam.bai"), emit: bam
+    tuple val(meta), path("*.vsearch_mergepairs.log"), emit: log
     tuple val("${task.process}"), val('bwa'), eval('bwa 2>&1 | sed -n "s/^Version: //p"'), topic: versions, emit: versions_bwa
     tuple val("${task.process}"), val('samtools'), eval("samtools version | sed '1!d;s/.* //'"), topic: versions, emit: versions_samtools
     tuple val("${task.process}"), val('vsearch'), eval("vsearch --version 2>&1 | head -n1 | sed 's/vsearch v//; s/_.*//'"), topic: versions, emit: versions_vsearch
@@ -26,37 +27,40 @@ process PREMERGE {
     """
     INDEX=`find -L ./ -name "*.amb" | sed 's/\\.amb\$//'`
 
-    # Convert the filtered paired alignments back to FASTQ. Written gzipped: these are pure
-    # intermediates, and at full scale (~80M read pairs per library) each one is ~27 GB
-    # uncompressed, which is what made the work directory grow to ~600 GB on the GID1A test_full.
-    samtools fastq -@ $task.cpus -1 forward_reads.fastq.gz -2 reverse_reads.fastq.gz -0 /dev/null -s /dev/null -n $bam
-
-    # Merge overlapping mates into one consensus read, so the overlap is counted once and its
-    # bases carry a recalculated quality, then re-align against the same index BWA_MEM used and
-    # re-apply the filter BAMFILTER_DMS applies to the paired alignments. Without that filter the
-    # counter sees the re-aligned BAM unfiltered: supplementary alignments of chimeric merged
-    # reads get counted twice, low-MAPQ hits get counted at all, and a merged read carrying a
-    # deletion is reported as whatever substitution it also happens to carry (gatk_formating
-    # keeps only X events).
+    # Merge the overlapping mates of each raw read pair into one consensus read, so the overlap is
+    # counted once and its bases carry a recalculated quality. Merging comes first, before any
+    # alignment: the reads are aligned once (as merged reads), and the filter below acts on exactly
+    # the alignments the counter reads. Pairs that cannot be merged are discarded.
     #
-    # The merged reads are streamed into bwa rather than written out: vsearch cannot gzip its
-    # output (given a .gz name it writes plain text under it), and the merged FASTQ is another
-    # ~27 GB per library. Streaming keeps it off disk entirely. Verified to produce a
-    # byte-identical alignment set to the file-based form.
-    vsearch --fastq_mergepairs forward_reads.fastq.gz \\
-        --reverse reverse_reads.fastq.gz \\
+    # The merged reads are streamed into bwa mem rather than written out (vsearch cannot gzip its
+    # output, and the merged FASTQ is ~27 GB per full-size library), and the alignments are filtered
+    # on the fly: no unmapped, secondary or supplementary records and MAPQ >= 30 (ext.args2), and no
+    # insertions, deletions or splice gaps. Without that filter, supplementary alignments of
+    # chimeric merged reads get counted twice, low-MAPQ hits get counted at all, and a merged read
+    # carrying a deletion is reported as whatever substitution it also happens to carry
+    # (gatk_formating keeps only X events). Wildtype reads are kept: the error correction needs them.
+    # The filtered alignments are coordinate-sorted and indexed in the same pipe: an unsorted BAM is
+    # about 3.5 times larger, and writing it out for a separate sort and index task only costs time.
+    vsearch --fastq_mergepairs ${reads[0]} \\
+        --reverse ${reads[1]} \\
         --fastqout - \\
         --threads $task.cpus \\
         $args \\
+        2> ${prefix}.vsearch_mergepairs.log \\
         | bwa mem -t $task.cpus \$INDEX - \\
         | samtools view -h $args2 - \\
         | awk '/^@/ || \$6 !~ /[IDN]/' \\
-        | samtools view -b --threads $task.cpus -o ${prefix}_merged.bam -
+        | samtools sort --threads $task.cpus -o ${prefix}.sorted.bam##idx##${prefix}.sorted.bam.bai --write-index -
+
+    # vsearch's merging statistics, also in the task log
+    cat ${prefix}.vsearch_mergepairs.log >&2
     """
 
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_merged.bam
+    touch ${prefix}.sorted.bam
+    touch ${prefix}.sorted.bam.bai
+    touch ${prefix}.vsearch_mergepairs.log
     """
 }

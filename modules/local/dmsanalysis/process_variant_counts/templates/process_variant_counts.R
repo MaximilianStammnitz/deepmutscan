@@ -137,7 +137,7 @@ filter_counts_by_codon_library(
 #########
 
 # input: NNK_codon_library_filtered_counts.csv-path, prefiltered_counts.csv-path (containing only NNK mutations), output_folder-path
-# output: completed counts_file with all possible variants (even if not measured in sequencing) -> NA in counts and counts_per_cov to 0.0000001 to deal with log-scale in following calculations
+# output: completed counts_file with all possible variants, including those never measured in sequencing (counts and counts_per_cov 0, observed FALSE)
 
 library(dplyr)
 library(Biostrings)  # Required for codon-to-amino-acid translation
@@ -194,16 +194,14 @@ complete_prefiltered_counts <- function(possible_nnk_path, prefiltered_counts_pa
   prefiltered_counts\$codon_mut <- toupper(prefiltered_counts\$codon_mut)
   merged_data <- full_join(prefiltered_counts, possible_nnk, by = "codon_mut")
 
-  # Placeholder for variants that are part of the programmed library but were never observed, so
-  # they still occupy a slot in the count distribution plots. The two columns previously used
-  # different magnitudes (1e-7 and 1e-6) for no reason; use one constant for both.
-  # NOTE: error correction can drive an observed variant to exactly 0, which therefore ranks
-  # BELOW a never-observed variant on a log scale and can yield Inf in logdiff. Making the two
-  # consistent with each other does not resolve that; see the open question in the release notes.
-  unobserved_placeholder <- 1e-6
+  # Programmed variants that were never observed get their true count of 0, flagged with
+  # observed = FALSE. Plots on a log scale (the LogDiff plot) place zeros themselves, at a floor
+  # derived from the data; a fixed placeholder (previously 1e-6) can rank above real variants in
+  # deeply sequenced libraries, where one read is fewer than 1e-6 counts per coverage.
   merged_data <- merged_data %>%
-    mutate(counts_per_cov = ifelse(is.na(counts_per_cov), unobserved_placeholder, counts_per_cov),
-           counts = ifelse(is.na(counts), unobserved_placeholder, counts))
+    mutate(observed = !is.na(counts),
+           counts_per_cov = ifelse(is.na(counts_per_cov), 0, counts_per_cov),
+           counts = ifelse(is.na(counts), 0, counts))
 
   # Calculate Hamming distance (varying_bases) and mutation details (aa_mut, pos_mut)
   merged_data <- merged_data %>%

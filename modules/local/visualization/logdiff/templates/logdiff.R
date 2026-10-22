@@ -1,91 +1,104 @@
 #!/usr/bin/env Rscript
 
-# Maybe develop additional ideas to characterise variants below 10 percentile -> Do we find patterns that help the user to understand why certain variants are hard to count?
-
-# input: completed_prefiltered_gatk path, output folder path
-# output: two logdiff-plots (counts_per_cov): 1st lineplot 2nd dotplot showing type of variant (varying bases - 1/2/3)
-
 library(dplyr)
 library(ggplot2)
 library(scales)
 
- logdiff_plot <- function(prefiltered_gatk_path) {
+# input: completed library table (all programmed variants; counts_per_cov 0 for variants with no
+#        counts, observed = FALSE for those never observed)
+# output: two LogDiff plots (counts per coverage, sorted, log scale): a line plot, and a dot plot
+#         coloured by the number of changed bases per codon
+#
+# Variants with no counts cannot be drawn on a log scale. They are placed at a floor derived from
+# the data - half the lowest non-zero counts per coverage in the library, i.e. below every observed
+# variant - and shown in grey. LogDiff is log10 of the 90th over the 10th percentile of all
+# programmed variants. When more than 10 % of the library has no counts, the 10th percentile would
+# be the floor, an artefact of the plot, so LogDiff is not reported; the share of variants without
+# counts, printed on every plot, is then the meaningful measure.
 
-   # Load the data
-   prefiltered_gatk <- read.table(prefiltered_gatk_path, sep = ",", fill = NA, header = TRUE)
+logdiff_plot <- function(completed_path) {
 
-   # Sort by counts_per_cov while keeping corresponding varying_bases
-   sorted_counts <- prefiltered_gatk %>%
-     arrange(counts_per_cov)  # Sort by counts_per_cov
+  completed <- read.table(completed_path, sep = ",", fill = NA, header = TRUE)
+  cpc <- completed\$counts_per_cov
+  cpc[is.na(cpc)] <- 0
+  if (!"observed" %in% names(completed)) {
+    completed\$observed <- cpc > 0
+  }
 
-   # Create a new column for the sorted index (1, 2, 3, ...)
-   sorted_counts\$ids <- 1:nrow(sorted_counts)
+  n_total    <- length(cpc)
+  n_never    <- sum(!completed\$observed)
+  n_zeroed   <- sum(completed\$observed & cpc == 0)    # observed, but corrected to 0
+  n_no_count <- n_never + n_zeroed
 
-   # Calculate Q1 (10% quantile) and Q3 (90% quantile)
-   Q1 <- quantile(sorted_counts\$counts_per_cov, 0.10, na.rm = TRUE)
-   Q3 <- quantile(sorted_counts\$counts_per_cov, 0.90, na.rm = TRUE)
+  nonzero <- cpc[cpc > 0]
+  if (length(nonzero) == 0) {
+    # Nothing to rank: write placeholder plots that say so, instead of failing the run
+    empty <- ggplot() +
+      annotate("text", x = 0, y = 0, label = "No programmed variant has counts in this library.") +
+      theme_void()
+    ggsave(filename = "logdiff_plot.pdf", plot = empty, device = "pdf", width = 10, height = 6)
+    ggsave(filename = "logdiff_varying_bases.pdf", plot = empty, device = "pdf", width = 10, height = 6)
+    return(invisible(NULL))
+  }
+  floor_value <- min(nonzero) / 2
 
-   # Calculate the LogDiff
-   LogDiff <- log10(Q3) - log10(Q1)
+  sorted_counts <- completed %>%
+    mutate(counts_per_cov_plot = ifelse(cpc > 0, cpc, floor_value),
+           category = ifelse(cpc > 0, as.character(varying_bases), "none")) %>%
+    arrange(counts_per_cov_plot)
+  sorted_counts\$ids <- seq_len(nrow(sorted_counts))
 
-   # Create the first plot with a line
-   line_plot <- ggplot(sorted_counts, aes(x = ids, y = counts_per_cov)) +
-     geom_line(color = "black") +
+  Q3 <- quantile(sorted_counts\$counts_per_cov_plot, 0.90, na.rm = TRUE)
+  if (n_no_count / n_total > 0.10) {
+    Q1 <- NA
+    logdiff_text <- "LogDiff: not defined (more than 10 % of variants without counts)"
+  } else {
+    Q1 <- quantile(sorted_counts\$counts_per_cov_plot, 0.10, na.rm = TRUE)
+    logdiff_text <- paste0("LogDiff = ", round(log10(Q3) - log10(Q1), 2))
+  }
+  percentile_lines <- c(Q1, Q3)[!is.na(c(Q1, Q3))]
 
-     # Set axis labels
-     xlab("Variants") +
-     ylab("Counts per Coverage") +
+  label <- paste0(
+    logdiff_text, "\\n",
+    "No counts: ", n_no_count, " of ", n_total, " variants (", round(100 * n_no_count / n_total, 1), " %)",
+    if (n_zeroed > 0) paste0(", ", n_zeroed, " of them corrected to 0") else ""
+  )
+  caption <- paste0(
+    "Variants without counts are drawn at half the lowest observed counts per coverage (",
+    format(signif(floor_value, 3), scientific = TRUE), ", dashed line)."
+  )
+  y_top <- max(sorted_counts\$counts_per_cov_plot)
 
-     # Apply logarithmic scale to the y-axis
-     scale_y_continuous(trans = 'log10') +
+  line_plot <- ggplot(sorted_counts, aes(x = ids, y = counts_per_cov_plot)) +
+    geom_line(color = "black") +
+    geom_hline(yintercept = floor_value, linetype = "dashed", color = "grey60") +
+    geom_hline(yintercept = percentile_lines, linetype = "dotted", color = "black") +
+    annotate("text", x = 0, y = y_top, label = label, hjust = 0, vjust = 1, size = 4.5, color = "black") +
+    scale_y_continuous(trans = "log10") +
+    labs(x = "Variants", y = "Counts per Coverage", caption = caption) +
+    theme_minimal()
+  ggsave(filename = "logdiff_plot.pdf", plot = line_plot, device = "pdf", width = 10, height = 6)
 
-     # Add horizontal dotted lines at Q1 and Q3
-     geom_hline(yintercept = Q1, linetype = "dotted", color = "black") +
-     geom_hline(yintercept = Q3, linetype = "dotted", color = "black") +
-
-     # Add the LogDiff value to the top left corner
-     annotate("text", x = 0, y = max(sorted_counts\$counts_per_cov), label = paste("LogDiff =", round(LogDiff, 2)), hjust = 0, vjust = 1, size = 5, color = "black") +
-
-     # Apply the minimal theme
-     theme_minimal()
-
-   # Save the line plot as a PDF
-   ggsave(filename = "logdiff_plot.pdf", plot = line_plot, device = "pdf", width = 10, height = 6)
-
-   # Create the second plot with colored dots based on varying_bases
-   colored_plot <- ggplot(sorted_counts, aes(x = ids, y = counts_per_cov, color = as.factor(varying_bases))) +
-
-     # Add horizontal dotted lines at Q1 and Q3
-     geom_hline(yintercept = Q1, linetype = "dotted", color = "black") +
-     geom_hline(yintercept = Q3, linetype = "dotted", color = "black") +
-
-     geom_point(size = 0.9) +  # Use points instead of lines
-
-     # Set axis labels
-     xlab("Variants") +
-     ylab("Counts per Coverage") +
-
-     # Apply logarithmic scale to the y-axis
-     scale_y_continuous(trans = 'log10') +
-
-     # Add the LogDiff value to the top left corner
-     annotate("text", x = 1, y = max(sorted_counts\$counts_per_cov), label = paste("LogDiff =", round(LogDiff, 2)), hjust = 0, vjust = 1, size = 5, color = "black") +
-
-     # Add color scale for varying_bases
-     scale_color_manual(values = c("1" = "chocolate", "2" = "darkolivegreen3", "3" = "deepskyblue1"), name = "Varying \\n Bases") +
-
-     # Apply the minimal theme
-     theme_minimal()
-
-   # Save the colored plot as a PDF
-   ggsave(filename = "logdiff_varying_bases.pdf", plot = colored_plot, device = "pdf", width = 10, height = 6)
- }
+  colored_plot <- ggplot(sorted_counts, aes(x = ids, y = counts_per_cov_plot, color = category)) +
+    geom_hline(yintercept = floor_value, linetype = "dashed", color = "grey60") +
+    geom_hline(yintercept = percentile_lines, linetype = "dotted", color = "black") +
+    geom_point(size = 0.9) +
+    annotate("text", x = 1, y = y_top, label = label, hjust = 0, vjust = 1, size = 4.5, color = "black") +
+    scale_y_continuous(trans = "log10") +
+    scale_color_manual(values = c("1" = "chocolate", "2" = "darkolivegreen3", "3" = "deepskyblue1", "none" = "grey70"),
+                       breaks = c("1", "2", "3", "none"),
+                       labels = c("1", "2", "3", "no counts"),
+                       name = "Varying \\n Bases") +
+    labs(x = "Variants", y = "Counts per Coverage", caption = caption) +
+    theme_minimal()
+  ggsave(filename = "logdiff_varying_bases.pdf", plot = colored_plot, device = "pdf", width = 10, height = 6)
+}
 
 #####
 # run function
 #####
 logdiff_plot(
-  prefiltered_gatk_path = "$library_completed_variantCounts"
+  completed_path = "$library_completed_variantCounts"
 )
 
 ####

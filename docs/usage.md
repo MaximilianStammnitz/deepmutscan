@@ -40,6 +40,13 @@ Each combination of `sample`, `type` and `replicate` may appear only once. Each 
 
 The samplesheet is checked when the pipeline starts, and the run stops with an error message naming the problem if, for example, a file is missing, a row is duplicated or the replicate numbers of `input` and `output` libraries do not match.
 
+The FASTQ files themselves are checked in two steps, before any reads are processed. Problems are collected across all libraries and reported together, so that all faulty files can be replaced at once.
+
+1. **At start-up**, from the first read of each file: a file is empty, is named `.gz` but is not gzip-compressed, or is not in FASTQ format; `file1` and `file2` are the same file, start with the same read, or start with reads of different names; a file is used by more than one library.
+2. **As the first step of the workflow** ([**fq lint**](https://github.com/stjude-rust-labs/fq)), on the complete files: a compressed file is truncated or corrupted (e.g. by an interrupted download or copy), a FASTQ record is malformed, `file1` and `file2` have different numbers of reads, or the read names of `file1` and `file2` do not match record by record (mates not in the same order). All other steps wait until every library has passed.
+
+Mates must be in the same order in `file1` and `file2`, because vsearch pairs reads by position: out-of-order mates would not merge, or merge into chimeric reads that look like double mutants. If both files contain the same reads in a different order (for example, lanes concatenated in a different order), re-pair them before running the pipeline with [`seqkit pair`](https://github.com/shenwei356/seqkit) or BBTools [`repair.sh`](https://github.com/bbushnell/BBTools).
+
 ## Reference and reading frame
 
 As of v1.0.0, all libraries in one run of `nf-core/deepmutscan` must stem from the same gene. Provide its wildtype sequence as a FASTA file via `--fasta`. We recommend that the reference contains N- and C-terminal flanking sequences of approximately one read length (e.g. from surrounding vector regions amplified during the sequencing library preparation), which helps to align reads more uniformly at the ends of the ORF.
@@ -68,7 +75,7 @@ nextflow run nf-core/deepmutscan \
    --outdir ./results
 ```
 
-This will launch the pipeline with the `docker` configuration profile (or the profile of your choice, see [below](#-profile)). It performs the default read QC, alignment, filtering, merging, variant counting, sequencing-error correction and library QC for every library in the samplesheet. Add `--fitness` to also estimate variant fitness from matched input and output libraries, and `--dimsum` and/or `--mutscan` for the additional fitness estimators.
+This will launch the pipeline with the `docker` configuration profile (or the profile of your choice, see [below](#-profile)). It performs the default read QC, read merging, alignment, filtering, variant counting, sequencing-error correction and library QC for every library in the samplesheet. Add `--fitness` to also estimate variant fitness from matched input and output libraries, and `--dimsum` and/or `--mutscan` for the additional fitness estimators.
 
 Note that the pipeline will create the following files in your working directory:
 
@@ -107,19 +114,23 @@ You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-c
 
 ## Pipeline steps in detail
 
-### 1. Alignment
+### 1. Read merging
 
-All paired-end raw reads are first quality-checked with [**FastQC**](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) and then aligned to the reference with [**BWA-MEM**](https://github.com/lh3/bwa). BWA-MEM is a highly efficient mapping algorithm for reads ≥ 70 bp.
+All paired-end raw reads are first quality-checked with [**FastQC**](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/).
 
-### 2. Filtering
+Even the highest-quality sequencing platforms do not have perfect base accuracy. To minimise the effect of base errors, which would otherwise be counted as false mutations, `nf-core/deepmutscan` uses the overlap of each read pair. As base errors on the forward and reverse read are largely independent, [**vsearch --fastq_mergepairs**](https://github.com/torognes/vsearch) converts each raw read pair into a single consensus read with adjusted base qualities. Read pairs that cannot be merged (overlap shorter than 10 bp) are discarded. The merging statistics of every library are saved in `intermediate_files/merged_reads/`.
 
-Alignments are filtered with [**samtools view**](https://www.htslib.org/doc/samtools-view.html): only mapped, non-secondary alignments with a mapping quality ≥ 30 and without insertions, deletions or splice gaps are kept before read merging, as indel-containing reads are most likely artefacts in substitution libraries.
+### 2. Alignment
+
+The merged reads are aligned to the reference with [**BWA-MEM**](https://github.com/lh3/bwa). BWA-MEM is a highly efficient mapping algorithm for reads ≥ 70 bp.
+
+### 3. Filtering
+
+Alignments are filtered with [**samtools view**](https://www.htslib.org/doc/samtools-view.html): only primary alignments (no unmapped, secondary or supplementary records) with a mapping quality ≥ 30 and without insertions, deletions or splice gaps are kept, as indel-containing reads are most likely artefacts in substitution libraries. The filtered alignments are coordinate-sorted and indexed with samtools, and used for variant counting.
 
 For long ORF site-saturation mutagenesis libraries, most aligned shotgun sequencing reads match the reference exactly. These wildtype reads are retained: they are ignored by the variant counter but contribute to the overall sequencing coverage and sequencing-error estimation.
 
-### 3. Read merging
-
-Even the highest-quality sequencing platforms do not have perfect base accuracy. To minimise the effect of base errors, which would otherwise be counted as false mutations, `nf-core/deepmutscan` uses the overlap of each read pair. As base errors on the forward and reverse read are largely independent, [**vsearch --fastq_mergepairs**](https://github.com/torognes/vsearch) converts each read pair into a single consensus read with adjusted base qualities. Read pairs that cannot be merged (overlap shorter than 10 bp), and reads whose mate was removed during filtering, are discarded. Merged reads are then re-aligned with BWA-MEM, coordinate-sorted and indexed with samtools.
+Merging, alignment, filtering, sorting and indexing run as one streamed, multi-threaded task per library (`PREMERGE`, using its `task.cpus`). The vsearch options (`ext.args`) and the samtools filter flags (`ext.args2`) can be changed in a custom config.
 
 > [!TIP]
 > The merging benefit is largest if the average DNA fragment size matches the read length. For example, libraries sequenced with 150 bp paired-end reads should ideally also be sheared or tagmented to a mean size of about 150 bp.

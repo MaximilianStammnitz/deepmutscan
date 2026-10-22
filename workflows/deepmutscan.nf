@@ -4,13 +4,10 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 include { FASTQC                 } from '../modules/nf-core/fastqc/main'
+include { FASTQ_CHECK            } from '../modules/local/fastq_check/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { BWA_INDEX              } from '../modules/nf-core/bwa/index/main'
-include { BWA_MEM                } from '../modules/nf-core/bwa/mem/main'
-include { BAMFILTER_DMS          } from '../modules/local/bamprocessing/bam_filter/main'
 include { PREMERGE               } from '../modules/local/bamprocessing/premerge/main'
-include { SAMTOOLS_SORT              } from '../modules/nf-core/samtools/sort/main'
-include { SAMTOOLS_INDEX             } from '../modules/nf-core/samtools/index/main'
 include { VARIANTCOUNTING            } from '../modules/local/variantcounting/main'
 include { DMSANALYSIS_AASEQ      } from '../modules/local/dmsanalysis/aa_seq/main'
 include { DMSANALYSIS_POSSIBLE_MUTATIONS      } from '../modules/local/dmsanalysis/possible_mutations/main'
@@ -36,6 +33,7 @@ include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pi
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_deepmutscan_pipeline'
 include { asBool                 } from '../subworkflows/local/utils_nfcore_deepmutscan_pipeline'
 include { asInt                  } from '../subworkflows/local/utils_nfcore_deepmutscan_pipeline'
+include { checkFastqReports      } from '../subworkflows/local/utils_nfcore_deepmutscan_pipeline'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,9 +98,22 @@ workflow DEEPMUTSCAN {
     }
 
     //
+    // MODULE: Check that the input FASTQ files are complete and consistent (fq lint). Every later
+    // step waits for all libraries to pass; otherwise the run stops with one message listing every
+    // faulty library. Quick checks of the first record of each file already ran at start-up.
+    //
+    FASTQ_CHECK(ch_samplesheet)
+
+    def ch_reads = ch_samplesheet
+        .join(FASTQ_CHECK.out.report)                                         // [meta, reads, report]
+        .toList()
+        .map { rows -> checkFastqReports(rows) }                              // stops the run on any FAIL
+        .flatMap { rows -> rows.collect { meta, reads, _report -> [ meta, reads ] } }
+
+    //
     // MODULE: Run FastQC
     //
-    FASTQC(ch_samplesheet)
+    FASTQC(ch_reads)
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.map{ _meta, file -> file })
 
     //
@@ -112,56 +123,18 @@ workflow DEEPMUTSCAN {
         ch_fasta
     )
 
-    // Broadcast index to all samples
-    def ch_bwa_index = BWA_INDEX.out.index
-
-    // Broadcast the index to all samples
-    def ch_bwa_index_broadcast = ch_samplesheet
-      .combine(ch_bwa_index)
-      .map { [it[2], it[3]] }
-
-    // Broadcast the fasta to all samples
-    def ch_fasta_broadcast = ch_fasta
-      .combine(ch_samplesheet)
-      .map { [it[0], it[1]] }
-
-    // Broadcast the sort flag to all samples
-    def ch_sort_bam = ch_samplesheet.map { false }
-
-    // Run BWA_MEM with all four inputs aligned
-    BWA_MEM(
-      ch_samplesheet,
-      ch_bwa_index_broadcast,
-      ch_fasta_broadcast,
-      ch_sort_bam
-    )
-
-    BAMFILTER_DMS (
-      BWA_MEM.out.bam
-    )
-
-    ch_versions = ch_versions.mix(BAMFILTER_DMS.out.versions)
-
-    // Re-use the index BWA_MEM aligned against rather than running `bwa index` once per library
-    def ch_bwa_index_for_premerge = BAMFILTER_DMS.out.bam
-      .combine(BWA_INDEX.out.index)                                    // [meta, bam, meta2, index]
-      .map { _meta, _bam, meta2, index -> tuple(meta2, index) }        // tuple(meta2, index) -- N
-
+    //
+    // MODULE: Merge each raw read pair into a consensus read (vsearch), align the merged reads
+    // (BWA-MEM), filter the alignments, and coordinate-sort and index them (samtools), streamed in
+    // one task per library. The sorted, indexed BAM is what the read-based counter needs.
+    //
     PREMERGE(
-      BAMFILTER_DMS.out.bam,       // tuple(val(meta), path(bam))
-      ch_bwa_index_for_premerge    // tuple(val(meta2), path(index))
+      ch_reads,                        // tuple(val(meta), path(reads)): checked raw paired-end FASTQ
+      BWA_INDEX.out.index.first()      // tuple(val(meta2), path(index)), as a value channel
     )
 
-    // Coordinate-sort + index the premerged BAM (required by the read-based counter)
-    SAMTOOLS_SORT(
-      PREMERGE.out.bam,                                        // tuple(val(meta), path(bam))
-      PREMERGE.out.bam.map { _meta, _bam -> [ [:], [], [] ] }, // empty fasta tuple (BAM sort)
-      Channel.value('')                                        // index_format '' -> index separately
-    )
-    SAMTOOLS_INDEX(SAMTOOLS_SORT.out.bam)
-
-    // Join sorted BAM with its index -> tuple(val(meta), path(bam), path(bai))
-    def ch_sorted_indexed = SAMTOOLS_SORT.out.bam.join(SAMTOOLS_INDEX.out.index)
+    // Sorted BAM with its index -> tuple(val(meta), path(bam), path(bai))
+    def ch_sorted_indexed = PREMERGE.out.bam
 
     // Broadcast singletons to N (one per sample), anchored on the sorted+indexed channel
     def ch_fasta_for_counts = ch_fasta.combine(ch_sorted_indexed).map { it[1] }          // path -- N
@@ -542,8 +515,6 @@ workflow DEEPMUTSCAN {
     multiqc_report = MULTIQC.out.report.map { _meta, report -> [report] }.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
     bwa_index      = BWA_INDEX.out.index
-    aligned_bam    = BWA_MEM.out.bam
-    filtered_bam   = BAMFILTER_DMS.out.bam
     premerged_bam  = PREMERGE.out.bam
 }
 

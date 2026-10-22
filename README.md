@@ -42,10 +42,10 @@ For more details on the individual steps, please read the [usage documentation](
 
 ## Pipeline summary
 
-1. Raw read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Alignment of reads to the reference ORF ([`BWA-MEM`](https://github.com/lh3/bwa))
-3. Filtering of unmapped, secondary, low mapping-quality and indel-containing alignments ([`samtools view`](https://www.htslib.org/))
-4. Merging of overlapping read pairs into consensus reads for base error reduction ([`vsearch --fastq_mergepairs`](https://github.com/torognes/vsearch)), re-alignment, sorting and indexing ([`samtools`](https://www.htslib.org/))
+1. Input FASTQ checks ([`fq lint`](https://github.com/stjude-rust-labs/fq)) and raw read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
+2. Merging of overlapping read pairs into consensus reads for base error reduction ([`vsearch --fastq_mergepairs`](https://github.com/torognes/vsearch))
+3. Alignment of the merged reads to the reference ORF ([`BWA-MEM`](https://github.com/lh3/bwa))
+4. Filtering of unmapped, secondary, supplementary, low mapping-quality and indel-containing alignments, sorting and indexing ([`samtools`](https://www.htslib.org/))
 5. Variant counting (custom counter built on [`pysam`](https://github.com/pysam-developers/pysam) and [`polars`](https://pola.rs))
 6. Annotation and filtering of variant counts against the programmed mutagenesis library
 7. Single-nucleotide variant sequencing-error correction via false double mutants or wildtype sequencing
