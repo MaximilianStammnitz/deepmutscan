@@ -177,14 +177,26 @@ Based on the library-filtered (and error-corrected) counts, `nf-core/deepmutscan
 
 With `--fitness`, libraries of each `sample` are grouped into a merged count table of all `input` and `output` replicates. Fitness is then estimated per replicate as the natural logarithm of each variant's output-to-input count ratio, relative to that of a synonymous wildtype proxy variant. As the proxy, the pipeline picks the synonymous variant with two nucleotide changes in one codon (or, if there is none, one nucleotide change) with the highest mean input count. Non-synonymous variants encoding the same amino acid sequence are aggregated. Per-replicate fitness values are linearly rescaled so that the median of synonymous variants is `0` and the median of stop codon variants is `-1` (if one of these anchors is missing, fitness values are only centred), and summarised as the mean and, with more than one replicate, the standard deviation across replicates.
 
-One parameter controls which variants are scored:
+Two parameters control which variants are scored, and how:
 
 - `--min_counts` (default `10`): minimum number of reads a variant needs in every `input` replicate to receive a fitness estimate. Variants with fewer input reads are poorly measured and are excluded. The threshold applies to each codon variant before synonymous codon variants are merged, in the same way for the default estimator, DiMSum and mutscan.
 - `--output_pseudocount` (default `1`): pseudocount added to `output` replicates in which a variant observed in the input was not detected ("dropouts"), so that strongly depleted variants still receive a finite fitness value. Set it to `0` to disable; dropout variants then receive no fitness estimate in that replicate.
 
 Two established statistical frameworks can be run on the same merged counts:
 
-- `--dimsum`: [DiMSum](https://github.com/lehner-lab/DiMSum) fitness estimates (stages 4–5 of DiMSum, without its own read processing). DiMSum is run on the same merged count table as the default estimator, so `--min_counts` has already been applied to its input; no DiMSum-specific count thresholds are set by the pipeline.
+- `--dimsum`: [DiMSum](https://github.com/lehner-lab/DiMSum) fitness estimates (stages 4–5 of DiMSum, without its own read processing), on the same merged count table as the default estimator. The pipeline passes `--min_counts` as `--fitnessMinInputCountAll` and `--output_pseudocount` as `--fitnessDropoutPseudocount`, so DiMSum scores the same variants. By default, DiMSum also runs with:
+  - `--mixedSubstitutions T`: the synonymous wildtype proxy can differ from the reference by one codon. With DiMSum's own default (`F`), single mutants relative to the proxy would be discarded as "mixed substitutions". With `T`, DiMSum also adds up synonymous codon variants before estimating fitness, as the default estimator does.
+  - `--fitnessErrorModel F`: DiMSum's error model needs enough variants that are well covered in every replicate, which sparse shotgun libraries often lack. Without it, DiMSum uses count-based errors only and no replicate normalisation. For deeply sequenced libraries, the error model can be switched on.
+  - `--retainIntermediateFiles T`.
+
+  These options are set with `ext.args` and can be changed in a custom config, for example:
+
+  ```groovy
+  process {
+      withName: 'RUN_DIMSUM' { ext.args = '--mixedSubstitutions T --fitnessErrorModel T --retainIntermediateFiles T' }
+  }
+  ```
+
 - `--mutscan`: [mutscan](https://github.com/fmicompbio/mutscan) enrichment estimates with edgeR and limma, on the same merged count table.
 
 ### Interactive variant effect inspection tool (`--pdb`)

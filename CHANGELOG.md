@@ -28,7 +28,7 @@ Initial release of nf-core/deepmutscan, created with the [nf-core](https://nf-co
 - Minimum observation count for a variant to be retained (`--min_counts`, default 1), applied during variant counting; the sequencing-error correction runs on the pre-threshold counts
 - Optional interactive 3D variant effect inspection tool built from a user-supplied wildtype structure (`--pdb`)
 - Self-contained, all-in-one run report (`deepmutscan_report.html`) embedding QC, error-correction, fitness, MultiQC and run statistics
-- `test` profile on a 50,000 read-pair subsample of a GID1A nicking-mutagenesis GluePCA experiment, with nf-test snapshot testing, and `test_full` profile on the complete dataset (ENA PRJEB110196); test data and the PDB structure are hosted on [nf-core/test-datasets](https://github.com/nf-core/test-datasets/tree/deepmutscan)
+- `test` profile on a 50,000 read-pair subsample of a GID1A nicking-mutagenesis GluePCA experiment, with three nf-test pipeline tests (all options; without fitness, error correction, SeqDepth and structure; stub run), and `test_full` profile on the complete dataset (ENA PRJEB110196); test data and the PDB structure are hosted on [nf-core/test-datasets](https://github.com/nf-core/test-datasets/tree/deepmutscan)
 
 ### `Dependencies`
 

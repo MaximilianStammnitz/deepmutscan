@@ -41,4 +41,57 @@ nextflow_pipeline {
             )
         }
     }
+
+    test("-profile test, without fitness, error correction, SeqDepth and structure") {
+
+        // The other branches of the workflow: --fitness false (no fitness modules at all),
+        // --error_correction none, --run_seqdepth false and no --pdb (no inspection tool)
+
+        when {
+            params {
+                outdir           = "$outputDir"
+                fitness          = false
+                error_correction = 'none'
+                run_seqdepth     = false
+                pdb              = null
+            }
+        }
+
+        then {
+            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/multiqc_plots', 'multiqc/multiqc_plots/**'])
+            def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
+            assert workflow.success
+            assertAll(
+                { assert snapshot(
+                    removeNextflowVersion("$outputDir/pipeline_info/nf_core_deepmutscan_software_mqc_versions.yml"),
+                    stable_path,
+                    stable_content
+                ).match() }
+            )
+        }
+    }
+
+    test("-profile test -stub") {
+
+        // Runs every module's stub block, so that stub outputs stay in step with the real outputs
+
+        options "-stub"
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+
+        then {
+            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/multiqc_plots', 'multiqc/multiqc_plots/**', 'fitness/DiMSum_results/**/reports/*.{pdf,png}'])
+            assert workflow.success
+            assertAll(
+                { assert snapshot(
+                    removeNextflowVersion("$outputDir/pipeline_info/nf_core_deepmutscan_software_mqc_versions.yml"),
+                    stable_path
+                ).match() }
+            )
+        }
+    }
 }

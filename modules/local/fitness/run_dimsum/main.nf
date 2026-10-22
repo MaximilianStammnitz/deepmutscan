@@ -33,7 +33,6 @@ process RUN_DIMSUM {
       --countPath "$counts_merged" \
       --startStage 4 \
       --stopStage 5 \
-      --mixedSubstitutions T \
       --fitnessMinInputCountAll ${min_counts} \
       --fitnessDropoutPseudocount ${output_pseudocount} \
       --numCores $task.cpus \
