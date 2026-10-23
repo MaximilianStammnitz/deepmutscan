@@ -52,6 +52,12 @@ process PREMERGE {
         | awk '/^@/ || \$6 !~ /[IDN]/' \\
         | samtools sort --threads $task.cpus -o ${prefix}.sorted.bam##idx##${prefix}.sorted.bam.bai --write-index -
 
+    # vsearch's first log line reports the host's RAM and core count, so the file differs
+    # between machines and the nf-test snapshot can never match across them. Drop that line and
+    # keep the statistics, which are reproducible; the version is reported through the versions
+    # topic anyway.
+    sed '1d' ${prefix}.vsearch_mergepairs.log > mergepairs.stats && mv mergepairs.stats ${prefix}.vsearch_mergepairs.log
+
     # vsearch's merging statistics, also in the task log
     cat ${prefix}.vsearch_mergepairs.log >&2
     """
