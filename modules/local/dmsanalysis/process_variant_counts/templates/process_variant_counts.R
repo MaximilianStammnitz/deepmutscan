@@ -23,8 +23,8 @@ process_raw_counts <- function(counts_file_path, output_csv_path) {
   counts_raw <- counts_raw[!(counts_raw\$aa_mut == "" | is.na(counts_raw\$aa_mut)), ]
 
   # Handle synonymous mutations: where aa_mut starts with "S" and pos_mut is either NA or ""
+  # (ifelse, paste0 and sub work on whole columns, so no row-by-row evaluation is needed)
   counts_raw <- counts_raw %>%
-    rowwise() %>%
     mutate(
       pos_mut = ifelse(
         (is.na(pos_mut) | pos_mut == "") & grepl("^S:", aa_mut),
@@ -81,40 +81,25 @@ filter_counts_by_codon_library <- function(counts_file_path, codon_library_path,
     stop("Codon library must contain columns 'Codon_Number', 'wt_codon', and 'Variant'.")
   }
 
-  # Filter the variant-count table
+  # Filter the variant-count table: single-codon variants whose position and mutated codon are in
+  # the library (as a programmed variant or as the wildtype codon), and whose changed bases lie
+  # within one codon (first to last changed position at most 2 apart). Both checks are evaluated
+  # for whole columns at once; row-by-row evaluation (rowwise()) was the slow part for long ORFs.
   counts_table\$codon_mut <- toupper(counts_table\$codon_mut)
+  library_keys <- unique(c(
+    paste(codon_library\$Codon_Number, codon_library\$Variant),
+    paste(codon_library\$Codon_Number, codon_library\$wt_codon)
+  ))
+  changed_base_span <- function(base_mut) {
+    vapply(strsplit(base_mut, ",\\\\s*"), function(mutations) {
+      positions <- suppressWarnings(as.numeric(str_extract(mutations, "^[0-9]+")))
+      suppressWarnings(max(positions, na.rm = TRUE) - min(positions, na.rm = TRUE))
+    }, numeric(1))
+  }
   filtered_counts <- counts_table %>%
-    filter(varying_codons == 1) %>% # Keep rows with single-codon mutations
-    rowwise() %>%
-    filter({
-      # Extract the position and mutated codon
-      codon_position <- as.numeric(sub(":.*", "", codon_mut)) # Extract position before ':'
-      mutated_codon <- sub(".*>", "", codon_mut)             # Extract codon after '>'
-
-      # Check if the position and codon are valid
-      is_in_library <- any(
-        codon_library\$Codon_Number == codon_position &
-          (codon_library\$Variant == mutated_codon |  # Check Variant column
-             codon_library\$wt_codon == mutated_codon)  # Check wt_codon column
-      )
-      is_in_library
-    }) %>%
-    ungroup() %>%
-    # Apply additional filtering based on mutation distances
-    rowwise() %>%
-    filter({
-      # Split base_mut into individual mutations
-      mutations <- unlist(strsplit(base_mut, ",\\\\s*"))  # Splits by comma and removes extra spaces
-      # Extract numeric positions from each mutation string
-      positions <- as.numeric(str_extract(mutations, "^[0-9]+"))
-
-      # Calculate the distance between the first and last position
-      distance <- max(positions, na.rm = TRUE) - min(positions, na.rm = TRUE)
-
-      # Keep rows where the distance is <= 2
-      distance <= 2
-    }) %>%
-    ungroup()
+    filter(varying_codons == 1) %>%
+    filter(paste(as.numeric(sub(":.*", "", codon_mut)), sub(".*>", "", codon_mut)) %in% library_keys) %>%
+    filter(changed_base_span(base_mut) <= 2)
 
   # Write the filtered variant-count table to the output file path
   write.csv(filtered_counts, file = output_file_path, row.names = FALSE)
@@ -137,45 +122,19 @@ filter_counts_by_codon_library(
 #########
 
 # input: NNK_codon_library_filtered_counts.csv-path, prefiltered_counts.csv-path (containing only NNK mutations), output_folder-path
-# output: completed counts_file with all possible variants (even if not measured in sequencing) -> NA in counts and counts_per_cov to 0.0000001 to deal with log-scale in following calculations
+# output: completed counts_file with all possible variants, including those never measured in sequencing (counts and counts_per_cov 0, observed FALSE)
 
 library(dplyr)
 library(Biostrings)  # Required for codon-to-amino-acid translation
 
-# Function to calculate Hamming distance (varying_bases)
+# Hamming distance between two codons (varying_bases), for whole columns at once
 hamming_distance <- function(wt_codon, variant_codon) {
-  sum(strsplit(wt_codon, "")[[1]] != strsplit(variant_codon, "")[[1]])
+  Reduce(`+`, lapply(1:3, function(i) as.integer(substr(wt_codon, i, i) != substr(variant_codon, i, i))))
 }
 
-# Function to get amino acid from codon
+# Amino acid of each codon (NA for invalid codons), for whole columns at once
 get_amino_acid <- function(codon) {
-  codon_table <- GENETIC_CODE
-  aa <- codon_table[[toupper(codon)]]
-  if (is.null(aa)) {
-    return(NA)  # Handle cases where codon is not valid
-  }
-  return(aa)
-}
-
-# Function to calculate mutation type (aa_mut) and pos_mut
-mutation_details <- function(wt_codon, variant_codon, codon_number) {
-  wt_aa <- get_amino_acid(wt_codon)
-  variant_aa <- get_amino_acid(variant_codon)
-
-  # If amino acids are different, it's a missense mutation; otherwise, synonymous
-  if (wt_aa != variant_aa) {
-    mutation_type <- "M"  # Missense mutation
-  } else {
-    mutation_type <- "S"  # Synonymous mutation
-  }
-
-  # aa_mut: Type of mutation and amino acid changes (e.g., M:D>S)
-  aa_mut <- paste0(mutation_type, ":", wt_aa, ">", variant_aa)
-
-  # pos_mut: Wild-type AA, codon position, mutated AA (e.g., D2Q)
-  pos_mut <- paste0(wt_aa, codon_number, variant_aa)
-
-  return(list(aa_mut = aa_mut, pos_mut = pos_mut))
+  unname(GENETIC_CODE[toupper(codon)])
 }
 
 complete_prefiltered_counts <- function(possible_nnk_path, prefiltered_counts_path, output_file_path) {
@@ -194,26 +153,23 @@ complete_prefiltered_counts <- function(possible_nnk_path, prefiltered_counts_pa
   prefiltered_counts\$codon_mut <- toupper(prefiltered_counts\$codon_mut)
   merged_data <- full_join(prefiltered_counts, possible_nnk, by = "codon_mut")
 
-  # Placeholder for variants that are part of the programmed library but were never observed, so
-  # they still occupy a slot in the count distribution plots. The two columns previously used
-  # different magnitudes (1e-7 and 1e-6) for no reason; use one constant for both.
-  # NOTE: error correction can drive an observed variant to exactly 0, which therefore ranks
-  # BELOW a never-observed variant on a log scale and can yield Inf in logdiff. Making the two
-  # consistent with each other does not resolve that; see the open question in the release notes.
-  unobserved_placeholder <- 1e-6
+  # Programmed variants that were never observed get their true count of 0, flagged with
+  # observed = FALSE. Plots on a log scale (the LogDiff plot) place zeros themselves, at a floor
+  # derived from the data; a fixed placeholder (previously 1e-6) can rank above real variants in
+  # deeply sequenced libraries, where one read is fewer than 1e-6 counts per coverage.
   merged_data <- merged_data %>%
-    mutate(counts_per_cov = ifelse(is.na(counts_per_cov), unobserved_placeholder, counts_per_cov),
-           counts = ifelse(is.na(counts), unobserved_placeholder, counts))
+    mutate(observed = !is.na(counts),
+           counts_per_cov = ifelse(is.na(counts_per_cov), 0, counts_per_cov),
+           counts = ifelse(is.na(counts), 0, counts))
 
-  # Calculate Hamming distance (varying_bases) and mutation details (aa_mut, pos_mut)
+  # Hamming distance (varying_bases) and mutation details: aa_mut (M = missense, S = synonymous,
+  # e.g. M:D>S) and pos_mut (wildtype AA, codon position, mutated AA, e.g. D2Q)
+  wt_aa      <- get_amino_acid(merged_data\$wt_codon)
+  variant_aa <- get_amino_acid(merged_data\$Variant)
   merged_data <- merged_data %>%
-    rowwise() %>%
     mutate(varying_bases = hamming_distance(wt_codon, Variant),
-           mutation_info = list(mutation_details(wt_codon, Variant, Codon_Number))) %>%
-    mutate(aa_mut = mutation_info\$aa_mut,  # Extract aa_mut
-           pos_mut = mutation_info\$pos_mut) %>%  # Extract pos_mut
-    ungroup() %>%
-    select(-mutation_info)  # Remove the temporary list column
+           aa_mut = paste0(ifelse(wt_aa != variant_aa, "M", "S"), ":", wt_aa, ">", variant_aa),
+           pos_mut = paste0(wt_aa, Codon_Number, variant_aa))
 
   # Save the merged data to a new CSV file
   write.csv(merged_data, file = output_file_path, row.names = FALSE)

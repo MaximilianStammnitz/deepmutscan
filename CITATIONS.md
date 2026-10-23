@@ -10,6 +10,10 @@
 
 ## Pipeline tools
 
+- [fq](https://github.com/stjude-rust-labs/fq)
+
+  > St. Jude Rust Labs. fq: FASTQ file manipulation and validation [Online].
+
 - [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 
   > Andrews S. (2010). FastQC: A Quality Control Tool for High Throughput Sequence Data [Online].

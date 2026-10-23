@@ -13,6 +13,7 @@ results/
 ├── multiqc/                             # MultiQC report across all FASTQ files
 ├── intermediate_files/                  # reference index, alignments, variant count tables, error correction
 │   ├── bwa/
+│   ├── merged_reads/                    # read-pair merging statistics
 │   ├── bam_files/sorted/                # only the sorted, indexed BAM is published
 │   ├── variant_counts/<library>/
 │   └── processed_variant_counts/<library>/
@@ -82,19 +83,16 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
   - `aa_seq.txt`: wildtype amino acid sequence translated from `--reading_frame`.
   - `possible_mutations.csv`: all programmed codon variants per position, as defined by `--mutagenesis_type`; used for library filtering and visualisation.
   - `bwa/`: BWA index of the reference FASTA.
+  - `merged_reads/<library>.vsearch_mergepairs.log`: read-pair merging statistics from vsearch (pairs merged, reasons for failed merges, fragment lengths, expected errors).
   - `bam_files/sorted/<library>.sorted.bam` and `.bai`: the coordinate-sorted, indexed alignments of
-    the merged read pairs - exactly what the variant counter reads. This is the only BAM published.
-    The three upstream stages (raw BWA-MEM output, the MAPQ/indel-filtered alignments, and the
-    re-aligned merged reads before sorting) are near-identical copies of the same reads: publishing
-    all four added over 100 GB per full-size run. They remain in the Nextflow work directory if you
-    need them for debugging.
-  - `variant_counts/<library>/<library>.variant_counts.tsv`: variant count table with one row per observed combination of nucleotide changes, its count, coverage and codon / amino acid annotation, after `--min_counts`.
-  - `variant_counts/<library>/<library>.variant_counts_prefilter.tsv`: the same table before `--min_counts` was applied. The sequencing-error correction reads this one, because its estimator depends on the low-count variants the threshold removes.
+    the merged read pairs, after filtering - exactly what the variant counter reads. This is the only
+    BAM the pipeline writes: merging, alignment, filtering and sorting run as one stream.
+  - `variant_counts/<library>/<library>.variant_counts.tsv`: variant count table with one row per observed combination of nucleotide changes, its count, coverage and codon / amino acid annotation. No count threshold is applied here: `--min_counts` acts only on fitness estimation.
   - `variant_counts/<library>/variant_counts_columns.tsv`: description of every column of the variant count table.
   - `processed_variant_counts/<library>/`:
     - `annotated_variantCounts.csv`: variant counts annotated with codon and amino acid changes and counts per coverage.
     - `variantCounts_filtered_by_library.csv`: single-codon variants that match the programmed library.
-    - `library_completed_variantCounts.csv`: all programmed variants, including unobserved ones (with a near-zero placeholder count), used for the count distribution plots.
+    - `library_completed_variantCounts.csv`: all programmed variants, including unobserved ones (counts 0, `observed` FALSE), used for the LogDiff plots.
     - `variantCounts_for_heatmaps.csv`: counts and counts per coverage aggregated per position and amino acid, used for the count heatmaps.
 
 </details>
@@ -128,7 +126,7 @@ The error-correction report shows the single-nucleotide substitution error corre
 - `library_QC/<library>/`
   - `counts_heatmap.pdf`: variant counts per position (x-axis) and mutant amino acid (y-axis).
   - `counts_per_cov_heatmap.pdf`: as above, but as counts per sequencing coverage.
-  - `logdiff_plot.pdf`: sorted, log-scale distribution of counts per coverage of all programmed variants, with the log10 ratio of their 90th and 10th percentiles.
+  - `logdiff_plot.pdf`: sorted, log-scale distribution of counts per coverage of all programmed variants, with the log10 ratio of their 90th and 10th percentiles (LogDiff) and the number of variants without counts. Variants without counts (never observed, or corrected to 0) are drawn at half the lowest observed counts per coverage. When they make up more than 10% of the library, the 10th percentile would be this floor, so LogDiff is not reported; the share of variants without counts is shown instead.
   - `logdiff_varying_bases.pdf`: as above, stratified by the number of changed nucleotides per codon.
   - `rolling_coverage.pdf`: sliding-window sequencing coverage along the ORF, with the coverage required to observe every amino acid variant `--aimed_cov` times.
   - `rolling_counts.pdf`: sliding-window variant counts along the ORF, stratified by the number of changed nucleotides per codon.

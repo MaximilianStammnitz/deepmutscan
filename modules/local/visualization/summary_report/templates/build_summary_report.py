@@ -48,6 +48,9 @@ CITATIONS = [
      "title": "Nextflow enables reproducible computational workflows",
      "journal": "Nature Biotechnology", "year": "2017", "volume": "35", "number": "4", "pages": "316--319",
      "doi": "10.1038/nbt.3820", "key": "DiTommaso2017"},
+    {"id": "fq", "pkgs": ["fq"],
+     "authors": "St. Jude Rust Labs", "title": "fq: FASTQ file manipulation and validation",
+     "year": "", "url": "https://github.com/stjude-rust-labs/fq", "key": "fq"},
     {"id": "fastqc", "pkgs": ["fastqc"],
      "authors": "Andrews S", "title": "FastQC: A Quality Control Tool for High Throughput Sequence Data",
      "year": "2010", "url": "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/", "key": "Andrews2010"},
@@ -61,6 +64,11 @@ CITATIONS = [
      "title": "Twelve years of SAMtools and BCFtools",
      "journal": "GigaScience", "year": "2021", "volume": "10", "number": "2", "pages": "giab008",
      "doi": "10.1093/gigascience/giab008", "key": "Danecek2021"},
+    {"id": "vsearch", "pkgs": ["vsearch"],
+     "authors": "Rognes T, Flouri T, Nichols B, Quince C, Mah\\u00e9 F",
+     "title": "VSEARCH: a versatile open source tool for metagenomics",
+     "journal": "PeerJ", "year": "2016", "volume": "4", "pages": "e2584",
+     "doi": "10.7717/peerj.2584", "key": "Rognes2016"},
     # BWA-MEM, not BWA-backtrack: the pipeline runs `bwa mem`, whose citation is the 2013 arXiv
     # preprint - the same one nf-core's own bwa/mem module points at. Li & Durbin 2009 describes
     # `bwa aln`, a different algorithm this pipeline never calls.

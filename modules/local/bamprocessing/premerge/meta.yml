@@ -1,5 +1,5 @@
 name: "premerge"
-description: Processes paired-end BAM files by converting them to FASTQ, merging overlapping paired reads using VSEARCH, and re-aligning the merged single-end reads to the wild-type reference using BWA.
+description: Merges the overlapping mates of raw paired-end reads into consensus reads using VSEARCH, aligns the merged reads to the reference using BWA-MEM, filters the alignments with samtools (no unmapped, secondary, supplementary, low mapping-quality or indel-containing alignments), and coordinate-sorts and indexes them, streamed in one step.
 keywords:
   - paired-end merging
   - alignment
@@ -34,10 +34,10 @@ input:
         description: |
           Groovy Map containing sample information
           e.g. `[ id:'test', single_end:false ]`
-    - bam:
+    - reads:
         type: file
-        description: Input paired-end BAM file
-        pattern: "*.{bam}"
+        description: Raw forward and reverse FASTQ files of one paired-end library
+        pattern: "*.{fastq,fq}{,.gz}"
   - - meta2:
         type: map
         description: Groovy Map containing reference information
@@ -53,10 +53,23 @@ output:
           description: |
             Groovy Map containing sample information
             e.g. `[ id:'test', single_end:false ]`
-      - "*_merged.bam":
+      - "*.sorted.bam":
           type: file
-          description: BAM file containing the merged, re-aligned and re-filtered reads
-          pattern: "*_merged.bam"
+          description: Coordinate-sorted BAM file of the merged, aligned and filtered reads
+          pattern: "*.sorted.bam"
+      - "*.sorted.bam.bai":
+          type: file
+          description: BAM index
+          pattern: "*.sorted.bam.bai"
+  - log:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+      - "*.vsearch_mergepairs.log":
+          type: file
+          description: vsearch merging statistics (pairs merged, reasons for failed merges, fragment lengths, expected errors)
+          pattern: "*.vsearch_mergepairs.log"
   - versions_bwa:
       - ${task.process}:
           type: string
