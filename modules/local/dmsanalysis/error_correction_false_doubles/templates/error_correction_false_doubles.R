@@ -2,7 +2,7 @@
 
 ## false-double mutant codon sequencing-error correction in nf-core/deepmutscan (nucleotide level).
 ##
-## Two estimators, ported VERBATIM from Maxi's scripts (24.06.2026):
+## Two estimators, ported verbatim from the original analysis scripts:
 ##   * MLE (default): per-SNV maximum-likelihood error rate e = F / m, applied per variant.
 ##   * EB:            pool F and m across SNVs, then a Gamma-Poisson empirical-Bayes fit with
 ##                    six-category shrinkage -> posterior-mean rate e_EB.
@@ -140,7 +140,7 @@ seq_error_correct_by_false_doubles_MLE <- function(wt_path, input_count_path_raw
   dual.codon.coverage.estimate <- matrix(NA, nrow = .max_dist, ncol = 2)
   colnames(dual.codon.coverage.estimate) <- c("Codon distance", "Estimate % max. possible coverage")
   dual.codon.coverage.estimate[,"Codon distance"] <- 1:nrow(dual.codon.coverage.estimate)
-  ## deepmutscan fix (Maxi-approved deviation from the verbatim script): fill the coverage-decay
+  ## deepmutscan fix (deliberate deviation from the original script): fill the coverage-decay
   ## lookup from the fitted quadratic evaluated at EVERY integer codon distance, instead of match()ing
   ## only the distances that happen to have an observed double. `pred_cov_perc = exp(predict(fit))`
   ## depends solely on codon_dist, so this is bit-identical to the original at every observed distance
@@ -387,7 +387,7 @@ seq_error_correct_by_false_doubles_EB <- function(wt_path, input_count_path_raw,
   dual.codon.coverage.estimate <- matrix(NA, nrow = .max_dist, ncol = 2)
   colnames(dual.codon.coverage.estimate) <- c("Codon distance", "Estimate % max. possible coverage")
   dual.codon.coverage.estimate[,"Codon distance"] <- 1:nrow(dual.codon.coverage.estimate)
-  ## deepmutscan fix (Maxi-approved deviation from the verbatim script): fill the coverage-decay
+  ## deepmutscan fix (deliberate deviation from the original script): fill the coverage-decay
   ## lookup from the fitted quadratic evaluated at EVERY integer codon distance, instead of match()ing
   ## only the distances that happen to have an observed double. `pred_cov_perc = exp(predict(fit))`
   ## depends solely on codon_dist, so this is bit-identical to the original at every observed distance
@@ -633,7 +633,7 @@ seq_error_correct_by_false_doubles_EB <- function(wt_path, input_count_path_raw,
 }
 
 ## -------------------------------------------------------------------------------------------------
-## I/O wrappers preserved from the pipeline module (not part of Maxi's estimator logic)
+## I/O wrappers preserved from the pipeline module (not part of the estimator logic)
 ## -------------------------------------------------------------------------------------------------
 
 # propagate corrected counts onto the completed library table (used by e.g. logdiff)
