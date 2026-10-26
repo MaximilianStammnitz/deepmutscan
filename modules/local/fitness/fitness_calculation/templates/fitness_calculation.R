@@ -319,35 +319,6 @@ run_fitness_estimation <- function(counts_path,
 }
 
 
-## 5. Version ##
-################
-
-# sessionInfo()
-# R version 4.5.1 (2025-06-13)
-# Platform: aarch64-apple-darwin20
-# Running under: macOS Sonoma 14.6.1
-#
-# Matrix products: default
-# BLAS:   /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib
-# LAPACK: /Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
-#
-# locale:
-# [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
-#
-# time zone: Europe/Madrid
-# tzcode source: internal
-#
-# attached base packages:
-# [1] stats4    stats     graphics  grDevices utils     datasets  methods   base
-#
-# other attached packages:
-# [1] Biostrings_2.76.0   GenomeInfoDb_1.44.2 XVector_0.48.0      IRanges_2.42.0      S4Vectors_0.46.0
-# [6] BiocGenerics_0.54.0 generics_0.1.4
-#
-# loaded via a namespace (and not attached):
-# [1] httr_1.4.7              compiler_4.5.1          R6_2.6.1                tools_4.5.1
-# [5] GenomeInfoDbData_1.2.14 rstudioapi_0.17.1       crayon_1.5.3            UCSC.utils_1.4.0
-# [9] jsonlite_2.0.0
 
 
 
