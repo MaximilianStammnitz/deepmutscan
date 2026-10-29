@@ -4,9 +4,9 @@ process MERGE_ALIGN {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity'
-        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/85/856173edaf176a724c7e5fe23987e42e5ab0bc476d20e458bf2a68d738e74293/data'
-        : 'community.wave.seqera.io/library/bwa_samtools_vsearch:593a959d25ab8798' }"
+    container "${workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container
+        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/1e/1e03db44377380bacb3a5ec57a7e77ad36603863b3f0e821d2268a47981572b1/data'
+        : 'community.wave.seqera.io/library/bwa_samtools_vsearch:68780a2d1eaef64d'}"
 
     input:
     tuple val(meta), path(reads)

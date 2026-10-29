@@ -8,9 +8,9 @@ process VARIANT_EFFECT_INSPECTION_TOOL {
 
     conda "${moduleDir}/environment.yml"
 
-    container "${ workflow.containerEngine == 'singularity'
-        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/97/977734114fdf9ecc0fbe96d3b2f09901eb1c4490de64d863a18679d926a028c4/data'
-        : 'community.wave.seqera.io/library/numpy_pandas_python:43a80707feb1fac3' }"
+    container "${workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container
+        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/f7/f727259d394cff047a26f3e3fa3a43e1a7a1c9dc51a35e6def7aa90a2085bb7b/data'
+        : 'community.wave.seqera.io/library/numpy_pandas_python:cfb38dbf0574e16d'}"
 
     input:
     tuple val(meta), path(pdb), path(fitness_tsv)

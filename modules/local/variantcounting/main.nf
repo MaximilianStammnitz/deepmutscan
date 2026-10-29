@@ -4,9 +4,9 @@ process VARIANTCOUNTING {
 
     conda "${moduleDir}/environment.yml"
 
-    container "${ workflow.containerEngine == 'singularity'
-        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/19/199686bb01fc18539d6ca35597ce574329a29ccae5f0b4bb1a6982f2bd3ce19a/data'
-        : 'community.wave.seqera.io/library/pysam_biopython_numpy_polars-lts-cpu_pruned:ac0353fd8d903112' }"
+    container "${workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container
+        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/62/6247bcc77159c0adea94e0fdc439006f94d499e9d32004470fa7e402ede08538/data'
+        : 'community.wave.seqera.io/library/pysam_biopython_numpy_polars-lts-cpu_pruned:f223db6b9aa476d1'}"
 
     input:
     tuple val(meta), path(bam), path(bai)

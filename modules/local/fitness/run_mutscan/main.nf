@@ -4,9 +4,9 @@ process RUN_MUTSCAN {
 
   conda "${moduleDir}/environment.yml"
 
-  container "${ workflow.containerEngine == 'singularity'
-      ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/f3/f380349424bfa454e3eeffd949426a422653d49a7ac7247cbf23f83e117ceb8a/data'
-      : 'community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-mutscan_r-base:4e27e7b9cc2d9218' }"
+  container "${workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container
+      ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/0a/0a32a5f637634c064a3caecc77d9e99f4367efd459bc28d1d4971ed5d05b73a7/data'
+      : 'community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-mutscan_r-base:c5cefc95c9f1002e'}"
 
   input:
     tuple val(sample), path(counts_merged)

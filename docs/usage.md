@@ -197,7 +197,9 @@ Two established statistical frameworks can be run on the same merged counts:
   }
   ```
 
-- `--mutscan`: [mutscan](https://github.com/fmicompbio/mutscan) enrichment estimates with edgeR and limma, on the same merged count table.
+  DiMSum's container is currently only available for x86-64 (amd64), so on ARM machines (e.g. Apple Silicon) `--dimsum` runs under amd64 emulation, and the `arm64` profile has no native image for it.
+
+- `--mutscan`: [mutscan](https://github.com/fmicompbio/mutscan) enrichment estimates with edgeR and limma, on the same merged count table. mutscan is currently only packaged for x86-64 (amd64), so on ARM machines (e.g. Apple Silicon) `--mutscan` runs under amd64 emulation, and the `arm64` profile has no native image for it.
 
 ### Interactive variant effect inspection tool (`--pdb`)
 
