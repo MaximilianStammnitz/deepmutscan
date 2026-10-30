@@ -82,3 +82,17 @@ output:
 authors:
   - "@BenjaminWehnert1008"
   - "@MaximilianStammnitz"
+containers:
+  docker:
+    linux/amd64:
+      name: community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-mutscan_r-base:c5cefc95c9f1002e
+      build_id: bd-c5cefc95c9f1002e_1
+      scan_id: sc-8d031d70a3f2734f_1
+  singularity:
+    linux/amd64:
+      name: oras://community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-mutscan_r-base:764a8471b126fb35
+      build_id: bd-764a8471b126fb35_2
+      https: https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/0a/0a32a5f637634c064a3caecc77d9e99f4367efd459bc28d1d4971ed5d05b73a7/data
+  conda:
+    linux/amd64:
+      lock_file: modules/local/fitness/run_mutscan/.conda-lock/linux_amd64-bd-c5cefc95c9f1002e_1.txt

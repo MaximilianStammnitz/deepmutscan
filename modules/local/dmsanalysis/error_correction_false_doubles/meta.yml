@@ -79,3 +79,27 @@ authors:
   - "@MaximilianStammnitz"
 maintainers:
   - "@BenjaminWehnert1008"
+containers:
+  docker:
+    linux/amd64:
+      name: community.wave.seqera.io/library/bioconductor-biostrings_r-base_r-stringr:801bac9c074a1f9b
+      build_id: bd-801bac9c074a1f9b_1
+      scan_id: sc-bb0508c32fbdbbf3_1
+    linux/arm64:
+      name: community.wave.seqera.io/library/bioconductor-biostrings_r-base_r-stringr:fbcc673012c62cb0
+      build_id: bd-fbcc673012c62cb0_1
+      scan_id: sc-c0377bfc5c678ddc_1
+  singularity:
+    linux/amd64:
+      name: oras://community.wave.seqera.io/library/bioconductor-biostrings_r-base_r-stringr:f7ed82e8081ab38d
+      build_id: bd-f7ed82e8081ab38d_1
+      https: https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/e5/e5a2e5419dff47f9dbcea8823692f60f9a1b1c1a1ee32ae56eef0ce2989f7b72/data
+    linux/arm64:
+      name: oras://community.wave.seqera.io/library/bioconductor-biostrings_r-base_r-stringr:1c3d5150b5f34345
+      build_id: bd-1c3d5150b5f34345_1
+      https: https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/cc/ccd8ca061a33803f1d15bc47bf8e6d87b242ebb66b387cbb5ab02a4c7670f425/data
+  conda:
+    linux/amd64:
+      lock_file: modules/local/dmsanalysis/error_correction_false_doubles/.conda-lock/linux_amd64-bd-801bac9c074a1f9b_1.txt
+    linux/arm64:
+      lock_file: modules/local/dmsanalysis/error_correction_false_doubles/.conda-lock/linux_arm64-bd-fbcc673012c62cb0_1.txt

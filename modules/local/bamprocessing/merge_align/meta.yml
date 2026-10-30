@@ -104,3 +104,27 @@ output:
 authors:
   - "@BenjaminWehnert1008"
   - "@MaximilianStammnitz"
+containers:
+  docker:
+    linux/arm64:
+      name: community.wave.seqera.io/library/bwa_samtools_vsearch:7b395b04348e2784
+      build_id: bd-7b395b04348e2784_1
+      scan_id: sc-e65dd0586cbc897a_1
+    linux/amd64:
+      name: community.wave.seqera.io/library/bwa_samtools_vsearch:68780a2d1eaef64d
+      build_id: bd-68780a2d1eaef64d_1
+      scan_id: sc-698b2de0eed7923f_1
+  singularity:
+    linux/arm64:
+      name: oras://community.wave.seqera.io/library/bwa_samtools_vsearch:a79e451fc67cfde0
+      build_id: bd-a79e451fc67cfde0_1
+      https: https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/6f/6f3676079712b1ee571f0a90e69b8d197fcb1ba68085cf475a25cc74bd4cb45a/data
+    linux/amd64:
+      name: oras://community.wave.seqera.io/library/bwa_samtools_vsearch:22b018a8e6d18e4f
+      build_id: bd-22b018a8e6d18e4f_1
+      https: https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/1e/1e03db44377380bacb3a5ec57a7e77ad36603863b3f0e821d2268a47981572b1/data
+  conda:
+    linux/amd64:
+      lock_file: modules/local/bamprocessing/merge_align/.conda-lock/linux_amd64-bd-68780a2d1eaef64d_1.txt
+    linux/arm64:
+      lock_file: modules/local/bamprocessing/merge_align/.conda-lock/linux_arm64-bd-7b395b04348e2784_1.txt
